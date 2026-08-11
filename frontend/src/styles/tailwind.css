@@ -1,0 +1,14 @@
+@import "tailwindcss";
+@custom-variant dark (&:where(.dark, .dark *));
+
+html, body, #root { min-height: 100%; }
+html { color-scheme: light; }
+body {
+  margin: 0;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  background: linear-gradient(135deg, #eff6ff 0%, #f8fbff 30%, #f5f9ff 100%);
+}
+html.dark { color-scheme: dark; }
+html.dark body {
+  background: radial-gradient(circle at 20% 20%, #14345a 0%, #0a192d 35%, #071221 100%);
+}

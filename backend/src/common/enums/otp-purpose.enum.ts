@@ -1,0 +1,4 @@
+export enum OtpPurpose {
+  FORGOT_PASSWORD = 'FORGOT_PASSWORD',
+  USER_INVITATION = 'USER_INVITATION',
+}

@@ -1,0 +1,227 @@
+{
+  "info": {
+    "name": "ActPulse Phase 1",
+    "description": "Authentication, users, devices, sensors and password flows for ActPulse backend.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:3000" },
+    { "key": "admin_token", "value": "" },
+    { "key": "device_api_key", "value": "" },
+    { "key": "user_id", "value": "" },
+    { "key": "device_id", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth - Login Admin",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{base_url}}/auth/login",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"benedict@act-ltd.com\",\n  \"password\": \"45653211\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Auth - Forgot Password",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{base_url}}/auth/forgot-password",
+        "body": { "mode": "raw", "raw": "{\n  \"email\": \"benedict@act-ltd.com\"\n}" }
+      }
+    },
+    {
+      "name": "Auth - Reset Password",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{base_url}}/auth/reset-password",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"benedict@act-ltd.com\",\n  \"otp\": \"123456\",\n  \"newPassword\": \"newpass123\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Auth - Change Password",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+        ],
+        "url": "{{base_url}}/auth/change-password",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"oldPassword\": \"45653211\",\n  \"newPassword\": \"newpass123\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Auth - Logout",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+        "url": "{{base_url}}/auth/logout"
+      }
+    },
+    {
+      "name": "Users - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+        ],
+        "url": "{{base_url}}/users",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Controller One\",\n  \"email\": \"controller1@act-ltd.com\",\n  \"role\": \"Controller\",\n  \"deviceIds\": [\"{{device_id}}\"]\n}"
+        }
+      }
+    },
+    {
+      "name": "Users - Activate",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{base_url}}/users/activate",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"controller1@act-ltd.com\",\n  \"otp\": \"123456\",\n  \"password\": \"controller123\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Users - List",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+        "url": "{{base_url}}/users"
+      }
+    },
+    {
+      "name": "Users - Get By ID",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+        "url": "{{base_url}}/users/{{user_id}}"
+      }
+    },
+    {
+      "name": "Users - Update",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+        ],
+        "url": "{{base_url}}/users/{{user_id}}",
+        "body": { "mode": "raw", "raw": "{\n  \"name\": \"Controller One Updated\"\n}" }
+      }
+    },
+    {
+      "name": "Users - Assign Devices",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+        ],
+        "url": "{{base_url}}/users/{{user_id}}/assign-devices",
+        "body": { "mode": "raw", "raw": "{\n  \"deviceIds\": [\"{{device_id}}\"]\n}" }
+      }
+    },
+    {
+      "name": "Users - Deactivate",
+      "request": {
+        "method": "DELETE",
+        "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+        "url": "{{base_url}}/users/{{user_id}}"
+      }
+    },
+    {
+      "name": "Devices - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+        ],
+        "url": "{{base_url}}/devices",
+        "body": { "mode": "raw", "raw": "{\n  \"name\": \"Main Generator\",\n  \"location\": \"HQ\"\n}" }
+      }
+    },
+    {
+      "name": "Devices - List",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+        "url": "{{base_url}}/devices"
+      }
+    },
+    {
+      "name": "Devices - Get By ID",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+        "url": "{{base_url}}/devices/{{device_id}}"
+      }
+    },
+    {
+      "name": "Devices - Update",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+        ],
+        "url": "{{base_url}}/devices/{{device_id}}",
+        "body": { "mode": "raw", "raw": "{\n  \"location\": \"HQ Block A\"\n}" }
+      }
+    },
+    {
+      "name": "Devices - Rotate Key",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+        "url": "{{base_url}}/devices/{{device_id}}/rotate-key"
+      }
+    },
+    {
+      "name": "Devices - Deactivate",
+      "request": {
+        "method": "DELETE",
+        "header": [{ "key": "Authorization", "value": "Bearer {{admin_token}}" }],
+        "url": "{{base_url}}/devices/{{device_id}}"
+      }
+    },
+    {
+      "name": "Sensors - Push Status",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "ApiKey {{device_api_key}}" }
+        ],
+        "url": "{{base_url}}/sensors/status",
+        "body": { "mode": "raw", "raw": "{\n  \"status\": \"ON\",\n  \"timestamp\": 1710000000\n}" }
+      }
+    },
+    {
+      "name": "Sensors - Heartbeat",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "ApiKey {{device_api_key}}" }
+        ],
+        "url": "{{base_url}}/sensors/heartbeat",
+        "body": { "mode": "raw", "raw": "{}" }
+      }
+    }
+  ]
+}
