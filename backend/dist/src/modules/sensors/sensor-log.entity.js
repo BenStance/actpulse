@@ -12,13 +12,21 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.SensorLog = void 0;
 const typeorm_1 = require("typeorm");
 const device_entity_1 = require("../devices/device.entity");
+const equipment_entity_1 = require("../equipment/equipment.entity");
 const sensor_status_enum_1 = require("../../common/enums/sensor-status.enum");
 let SensorLog = class SensorLog {
     id;
     deviceId;
     device;
+    equipmentId;
+    equipment;
     status;
     recordedAt;
+    receivedAt;
+    timestampBasis;
+    source;
+    eventId;
+    kind;
 };
 exports.SensorLog = SensorLog;
 __decorate([
@@ -30,21 +38,59 @@ __decorate([
     __metadata("design:type", String)
 ], SensorLog.prototype, "deviceId", void 0);
 __decorate([
-    (0, typeorm_1.ManyToOne)(() => device_entity_1.Device, (device) => device.sensorLogs, { onDelete: 'CASCADE' }),
+    (0, typeorm_1.ManyToOne)(() => device_entity_1.Device, (device) => device.sensorLogs, {
+        onDelete: 'RESTRICT',
+    }),
     (0, typeorm_1.JoinColumn)({ name: 'device_id' }),
     __metadata("design:type", device_entity_1.Device)
 ], SensorLog.prototype, "device", void 0);
 __decorate([
-    (0, typeorm_1.Column)({
-        type: 'enum',
-        enum: sensor_status_enum_1.SensorStatus,
+    (0, typeorm_1.Column)({ name: 'equipment_id', type: 'uuid' }),
+    __metadata("design:type", String)
+], SensorLog.prototype, "equipmentId", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => equipment_entity_1.Equipment, (equipment) => equipment.observations, {
+        onDelete: 'RESTRICT',
     }),
+    (0, typeorm_1.JoinColumn)({ name: 'equipment_id' }),
+    __metadata("design:type", equipment_entity_1.Equipment)
+], SensorLog.prototype, "equipment", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ type: 'enum', enum: sensor_status_enum_1.SensorStatus }),
     __metadata("design:type", String)
 ], SensorLog.prototype, "status", void 0);
 __decorate([
-    (0, typeorm_1.Column)({ name: 'recorded_at', type: 'timestamp', default: () => 'CURRENT_TIMESTAMP' }),
+    (0, typeorm_1.Column)({
+        name: 'recorded_at',
+        type: 'timestamptz',
+        default: () => 'CURRENT_TIMESTAMP',
+    }),
     __metadata("design:type", Date)
 ], SensorLog.prototype, "recordedAt", void 0);
+__decorate([
+    (0, typeorm_1.Column)({
+        name: 'received_at',
+        type: 'timestamptz',
+        default: () => 'CURRENT_TIMESTAMP',
+    }),
+    __metadata("design:type", Date)
+], SensorLog.prototype, "receivedAt", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'timestamp_basis' }),
+    __metadata("design:type", String)
+], SensorLog.prototype, "timestampBasis", void 0);
+__decorate([
+    (0, typeorm_1.Column)(),
+    __metadata("design:type", String)
+], SensorLog.prototype, "source", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'event_id', type: 'varchar', nullable: true }),
+    __metadata("design:type", Object)
+], SensorLog.prototype, "eventId", void 0);
+__decorate([
+    (0, typeorm_1.Column)(),
+    __metadata("design:type", String)
+], SensorLog.prototype, "kind", void 0);
 exports.SensorLog = SensorLog = __decorate([
     (0, typeorm_1.Entity)('sensor_logs')
 ], SensorLog);

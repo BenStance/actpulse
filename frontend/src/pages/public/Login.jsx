@@ -5,7 +5,6 @@ import { motion } from 'framer-motion';
 import Particles from '@tsparticles/react';
 import { loadSlim } from '@tsparticles/slim';
 import { useThemeContext } from '../../context/ThemeContext';
-import Loader from '../../components/common/Loader';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import { useAuthStore } from '../../store/auth.store';
@@ -14,11 +13,10 @@ import logoImage from '../../assets/images/logo.png';
 import { Mail, Lock, ArrowRight, Sun, Moon } from 'lucide-react';
 
 export default function Login() {
-  const [email, setEmail] = useState('benedict@act-ltd.com');
-  const [password, setPassword] = useState('45653211');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isAnimating, setIsAnimating] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const navigate = useNavigate();
   const { login, loading } = useAuthStore();
   const { darkMode, toggleTheme, getBrandPrimary, getBrandSecondary } = useThemeContext();
@@ -31,7 +29,6 @@ export default function Login() {
   }, []);
 
   useEffect(() => {
-    setMounted(true);
     const timer = setTimeout(() => setIsAnimating(true), 300);
     return () => clearTimeout(timer);
   }, []);
@@ -44,13 +41,11 @@ export default function Login() {
       const role = data.user.role;
       if (role === ROLES.ADMIN) navigate('/admin/dashboard');
       else if (role === ROLES.CONTROLLER) navigate('/controller/dashboard');
-      else navigate('/user/dashboard');
+      else setError('This account does not have access to a dashboard.');
     } catch (err) {
       setError(err?.response?.data?.message || 'Login failed. Please check your credentials.');
     }
   };
-
-  if (!mounted) return <Loader fullScreen />;
 
   return (
     <div className="relative min-h-screen overflow-hidden">

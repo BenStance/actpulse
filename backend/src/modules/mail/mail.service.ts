@@ -5,12 +5,12 @@ import * as nodemailer from 'nodemailer';
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
-  private readonly transporter;
+  private readonly transporter: nodemailer.Transporter;
 
   constructor(private readonly configService: ConfigService) {
     this.transporter = nodemailer.createTransport({
       host: this.configService.get<string>('EMAIL_HOST'),
-      port: this.configService.get<number>('EMAIL_PORT'),
+      port: Number(this.configService.get<string>('EMAIL_PORT')),
       secure: false,
       auth: {
         user: this.configService.get<string>('EMAIL_USER'),
@@ -30,7 +30,8 @@ export class MailService {
       text: `Welcome to ActPulse!\n\nUse this OTP to activate your account: ${otp}\nActivation Token: ${token}\n\nThis code expires in 30 minutes.`,
       html: this.renderTemplate({
         accentColor: '#3B82F6',
-        accentGradient: 'linear-gradient(135deg, #1D4ED8 0%, #3B82F6 50%, #06B6D4 100%)',
+        accentGradient:
+          'linear-gradient(135deg, #1D4ED8 0%, #3B82F6 50%, #06B6D4 100%)',
         badgeColor: '#DBEAFE',
         badgeText: '#1E40AF',
         iconSvg: `
@@ -39,8 +40,9 @@ export class MailService {
             <path d="M10 18L15.5 23.5L26 13" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>`,
         tag: 'INVITATION',
-        title: 'Welcome aboard,<br/>you\'re almost in.',
-        subtitle: 'Your ActPulse monitoring workspace is ready — just one step away.',
+        title: "Welcome aboard,<br/>you're almost in.",
+        subtitle:
+          'Your ActPulse monitoring workspace is ready — just one step away.',
         body: `
           <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.7;">
             You've been invited to join <strong style="color:#111827;">ActPulse</strong> — the intelligent IoT generator
@@ -75,7 +77,8 @@ export class MailService {
           <!-- Expiry Notice -->
           ${renderTimerBadge('#FEF3C7', '#92400E', '#FDE68A', '⏱', 'Expires in 30 minutes — activate before time runs out.')}
         `,
-        footer: 'Not expecting this email? You can safely ignore it, or contact your system administrator if something seems wrong.',
+        footer:
+          'Not expecting this email? You can safely ignore it, or contact your system administrator if something seems wrong.',
       }),
     });
   }
@@ -87,7 +90,8 @@ export class MailService {
       text: `We received a password reset request.\n\nYour OTP is: ${otp}\n\nThis code expires in 10 minutes.`,
       html: this.renderTemplate({
         accentColor: '#F97316',
-        accentGradient: 'linear-gradient(135deg, #C2410C 0%, #F97316 50%, #FBBF24 100%)',
+        accentGradient:
+          'linear-gradient(135deg, #C2410C 0%, #F97316 50%, #FBBF24 100%)',
         badgeColor: '#FEF3C7',
         badgeText: '#92400E',
         iconSvg: `
@@ -99,7 +103,8 @@ export class MailService {
           </svg>`,
         tag: 'SECURITY',
         title: 'Password reset<br/>requested.',
-        subtitle: 'Use the code below to securely reset your ActPulse password.',
+        subtitle:
+          'Use the code below to securely reset your ActPulse password.',
         body: `
           <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.7;">
             We received a request to reset the password associated with your <strong style="color:#111827;">ActPulse</strong> account.
@@ -128,7 +133,8 @@ export class MailService {
             </p>
           </div>
         `,
-        footer: 'For your protection, never share this code with anyone — ActPulse support will never ask for your OTP.',
+        footer:
+          'For your protection, never share this code with anyone — ActPulse support will never ask for your OTP.',
       }),
     });
   }
@@ -140,7 +146,8 @@ export class MailService {
       text: 'Your ActPulse password was changed successfully. If this was not you, contact support immediately.',
       html: this.renderTemplate({
         accentColor: '#10B981',
-        accentGradient: 'linear-gradient(135deg, #065F46 0%, #10B981 50%, #34D399 100%)',
+        accentGradient:
+          'linear-gradient(135deg, #065F46 0%, #10B981 50%, #34D399 100%)',
         badgeColor: '#D1FAE5',
         badgeText: '#064E3B',
         iconSvg: `
@@ -173,13 +180,20 @@ export class MailService {
             <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#6B7280;margin-bottom:12px;">
               Security Tips
             </div>
-            ${['Use a unique password you do not use elsewhere.', 'Enable two-factor authentication if available.', 'Never share your password with anyone, including support.']
-              .map(tip => `
+            ${[
+              'Use a unique password you do not use elsewhere.',
+              'Enable two-factor authentication if available.',
+              'Never share your password with anyone, including support.',
+            ]
+              .map(
+                (tip) => `
                 <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;">
                   <div style="width:20px;height:20px;background:#D1FAE5;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;font-size:11px;color:#065F46;">✓</div>
                   <p style="margin:0;font-size:13.5px;color:#4B5563;line-height:1.5;">${tip}</p>
                 </div>
-              `).join('')}
+              `,
+              )
+              .join('')}
           </div>
 
           <!-- Warning -->
@@ -189,7 +203,8 @@ export class MailService {
             </p>
           </div>
         `,
-        footer: 'This is an automated security notification from ActPulse. Please do not reply to this email.',
+        footer:
+          'This is an automated security notification from ActPulse. Please do not reply to this email.',
       }),
     });
   }
@@ -206,8 +221,7 @@ export class MailService {
   }) {
     const user = this.configService.get<string>('EMAIL_USER');
     if (!user) {
-      this.logger.warn(`Email skipped. Missing EMAIL_USER. Target: ${payload.to}`);
-      return;
+      throw new Error('Email delivery is not configured');
     }
 
     await this.transporter.sendMail({

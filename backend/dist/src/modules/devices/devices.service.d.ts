@@ -1,63 +1,306 @@
-import { Repository } from 'typeorm';
-import { SensorLog } from '../sensors/sensor-log.entity';
-import { User } from '../users/user.entity';
+import { DataSource, Repository } from 'typeorm';
+import { Device, DeviceLifecycle } from './device.entity';
 import { CreateDeviceDto } from './dto/create-device.dto';
+import { ReplaceDeviceDto } from './dto/replace-device.dto';
 import { UpdateDeviceDto } from './dto/update-device.dto';
-import { Device } from './device.entity';
+import { Equipment } from '../equipment/equipment.entity';
+import { MonitoringService, EquipmentAccessService } from '../monitoring/monitoring.service';
+import { Organization } from '../organizations/organization.entity';
+import { User } from '../users/user.entity';
+import { AuditTrailService } from '../billing/audit-trail.service';
+export declare function newDeviceCredential(): {
+    apiKey: string;
+    identifier: string;
+    hash: string;
+};
 export declare class DevicesService {
-    private readonly devicesRepository;
-    private readonly sensorLogsRepository;
-    private readonly usersRepository;
-    constructor(devicesRepository: Repository<Device>, sensorLogsRepository: Repository<SensorLog>, usersRepository: Repository<User>);
-    create(dto: CreateDeviceDto): Promise<Device>;
+    private readonly devices;
+    private readonly equipment;
+    private readonly organizations;
+    private readonly users;
+    private readonly dataSource;
+    private readonly access;
+    private readonly monitoring;
+    private readonly auditTrail;
+    constructor(devices: Repository<Device>, equipment: Repository<Equipment>, organizations: Repository<Organization>, users: Repository<User>, dataSource: DataSource, access: EquipmentAccessService, monitoring: MonitoringService, auditTrail: AuditTrailService);
+    create(dto: CreateDeviceDto, actorId: string): Promise<{
+        device: {
+            id: string;
+            name: string;
+            location: string;
+            organizationId: string;
+            equipmentId: string | null;
+            equipment: {
+                id: string;
+                name: string;
+                type: import("../equipment/equipment.entity").EquipmentType;
+                monitoringDefinition: import("../equipment/equipment.entity").MonitoringDefinition | null;
+                site: {
+                    id: string;
+                    name: string;
+                } | null;
+            } | null;
+            deviceIdentifier: string;
+            hardwareModel: string | null;
+            firmwareVersion: string | null;
+            lifecycleState: DeviceLifecycle;
+            isActive: boolean;
+            connectivity: string;
+            currentStatus: string;
+            lastKnownStatus: import("../../common/enums/sensor-status.enum").SensorStatus | null;
+            lastReadingAt: Date | null;
+            firstSeenAt: Date | null;
+            lastSeenAt: Date | null;
+            heartbeatIntervalSeconds: number;
+            offlineTimeoutSeconds: number;
+            provisionedAt: Date | null;
+            rotatedAt: Date | null;
+            createdAt: Date;
+            updatedAt: Date;
+        };
+        apiKey: string;
+        provisioning: {
+            endpoint: string;
+            heartbeatEndpoint: string;
+            authorization: string;
+            deviceIdentifier: string;
+            heartbeatIntervalSeconds: number;
+            offlineTimeoutSeconds: number;
+            requiresHttpsInProduction: boolean;
+        };
+    }>;
+    replace(id: string, dto: ReplaceDeviceDto, actorId: string): Promise<{
+        device: {
+            id: string;
+            name: string;
+            location: string;
+            organizationId: string;
+            equipmentId: string | null;
+            equipment: {
+                id: string;
+                name: string;
+                type: import("../equipment/equipment.entity").EquipmentType;
+                monitoringDefinition: import("../equipment/equipment.entity").MonitoringDefinition | null;
+                site: {
+                    id: string;
+                    name: string;
+                } | null;
+            } | null;
+            deviceIdentifier: string;
+            hardwareModel: string | null;
+            firmwareVersion: string | null;
+            lifecycleState: DeviceLifecycle;
+            isActive: boolean;
+            connectivity: string;
+            currentStatus: string;
+            lastKnownStatus: import("../../common/enums/sensor-status.enum").SensorStatus | null;
+            lastReadingAt: Date | null;
+            firstSeenAt: Date | null;
+            lastSeenAt: Date | null;
+            heartbeatIntervalSeconds: number;
+            offlineTimeoutSeconds: number;
+            provisionedAt: Date | null;
+            rotatedAt: Date | null;
+            createdAt: Date;
+            updatedAt: Date;
+        };
+        apiKey: string;
+        provisioning: {
+            endpoint: string;
+            heartbeatEndpoint: string;
+            authorization: string;
+            deviceIdentifier: string;
+            heartbeatIntervalSeconds: number;
+            offlineTimeoutSeconds: number;
+            requiresHttpsInProduction: boolean;
+        };
+    }>;
     findAll(userId: string): Promise<{
-        currentStatus: string;
-        lastReadingAt: Date | null;
         id: string;
         name: string;
         location: string;
-        apiKey: string;
+        organizationId: string;
+        equipmentId: string | null;
+        equipment: {
+            id: string;
+            name: string;
+            type: import("../equipment/equipment.entity").EquipmentType;
+            monitoringDefinition: import("../equipment/equipment.entity").MonitoringDefinition | null;
+            site: {
+                id: string;
+                name: string;
+            } | null;
+        } | null;
+        deviceIdentifier: string;
+        hardwareModel: string | null;
+        firmwareVersion: string | null;
+        lifecycleState: DeviceLifecycle;
         isActive: boolean;
+        connectivity: string;
+        currentStatus: string;
+        lastKnownStatus: import("../../common/enums/sensor-status.enum").SensorStatus | null;
+        lastReadingAt: Date | null;
+        firstSeenAt: Date | null;
+        lastSeenAt: Date | null;
+        heartbeatIntervalSeconds: number;
+        offlineTimeoutSeconds: number;
+        provisionedAt: Date | null;
+        rotatedAt: Date | null;
         createdAt: Date;
         updatedAt: Date;
-        sensorLogs: SensorLog[];
-        users: User[];
     }[]>;
     findOne(id: string, userId: string): Promise<{
-        currentStatus: string;
-        lastReadingAt: Date | null;
         id: string;
         name: string;
         location: string;
-        apiKey: string;
+        organizationId: string;
+        equipmentId: string | null;
+        equipment: {
+            id: string;
+            name: string;
+            type: import("../equipment/equipment.entity").EquipmentType;
+            monitoringDefinition: import("../equipment/equipment.entity").MonitoringDefinition | null;
+            site: {
+                id: string;
+                name: string;
+            } | null;
+        } | null;
+        deviceIdentifier: string;
+        hardwareModel: string | null;
+        firmwareVersion: string | null;
+        lifecycleState: DeviceLifecycle;
         isActive: boolean;
+        connectivity: string;
+        currentStatus: string;
+        lastKnownStatus: import("../../common/enums/sensor-status.enum").SensorStatus | null;
+        lastReadingAt: Date | null;
+        firstSeenAt: Date | null;
+        lastSeenAt: Date | null;
+        heartbeatIntervalSeconds: number;
+        offlineTimeoutSeconds: number;
+        provisionedAt: Date | null;
+        rotatedAt: Date | null;
         createdAt: Date;
         updatedAt: Date;
-        sensorLogs: SensorLog[];
-        users: User[];
     }>;
-    update(id: string, dto: UpdateDeviceDto, userId: string): Promise<{
-        currentStatus: string;
-        lastReadingAt: Date | null;
+    update(id: string, dto: UpdateDeviceDto, actorId: string): Promise<{
         id: string;
         name: string;
         location: string;
-        apiKey: string;
+        organizationId: string;
+        equipmentId: string | null;
+        equipment: {
+            id: string;
+            name: string;
+            type: import("../equipment/equipment.entity").EquipmentType;
+            monitoringDefinition: import("../equipment/equipment.entity").MonitoringDefinition | null;
+            site: {
+                id: string;
+                name: string;
+            } | null;
+        } | null;
+        deviceIdentifier: string;
+        hardwareModel: string | null;
+        firmwareVersion: string | null;
+        lifecycleState: DeviceLifecycle;
         isActive: boolean;
+        connectivity: string;
+        currentStatus: string;
+        lastKnownStatus: import("../../common/enums/sensor-status.enum").SensorStatus | null;
+        lastReadingAt: Date | null;
+        firstSeenAt: Date | null;
+        lastSeenAt: Date | null;
+        heartbeatIntervalSeconds: number;
+        offlineTimeoutSeconds: number;
+        provisionedAt: Date | null;
+        rotatedAt: Date | null;
         createdAt: Date;
         updatedAt: Date;
-        sensorLogs: SensorLog[];
-        users: User[];
     }>;
-    deactivate(id: string, userId: string): Promise<{
-        message: string;
-    }>;
-    rotateKey(id: string, userId: string): Promise<{
+    setLifecycle(id: string, state: DeviceLifecycle, actorId: string): Promise<{
         id: string;
-        apiKey: string;
+        name: string;
+        location: string;
+        organizationId: string;
+        equipmentId: string | null;
+        equipment: {
+            id: string;
+            name: string;
+            type: import("../equipment/equipment.entity").EquipmentType;
+            monitoringDefinition: import("../equipment/equipment.entity").MonitoringDefinition | null;
+            site: {
+                id: string;
+                name: string;
+            } | null;
+        } | null;
+        deviceIdentifier: string;
+        hardwareModel: string | null;
+        firmwareVersion: string | null;
+        lifecycleState: DeviceLifecycle;
+        isActive: boolean;
+        connectivity: string;
+        currentStatus: string;
+        lastKnownStatus: import("../../common/enums/sensor-status.enum").SensorStatus | null;
+        lastReadingAt: Date | null;
+        firstSeenAt: Date | null;
+        lastSeenAt: Date | null;
+        heartbeatIntervalSeconds: number;
+        offlineTimeoutSeconds: number;
+        provisionedAt: Date | null;
+        rotatedAt: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
     }>;
-    private generateApiKey;
-    private attachCurrentStatus;
-    private resolveAccessibleDeviceIds;
-    private assertDeviceAccess;
+    rotateKey(id: string, actorId: string): Promise<{
+        device: {
+            id: string;
+            name: string;
+            location: string;
+            organizationId: string;
+            equipmentId: string | null;
+            equipment: {
+                id: string;
+                name: string;
+                type: import("../equipment/equipment.entity").EquipmentType;
+                monitoringDefinition: import("../equipment/equipment.entity").MonitoringDefinition | null;
+                site: {
+                    id: string;
+                    name: string;
+                } | null;
+            } | null;
+            deviceIdentifier: string;
+            hardwareModel: string | null;
+            firmwareVersion: string | null;
+            lifecycleState: DeviceLifecycle;
+            isActive: boolean;
+            connectivity: string;
+            currentStatus: string;
+            lastKnownStatus: import("../../common/enums/sensor-status.enum").SensorStatus | null;
+            lastReadingAt: Date | null;
+            firstSeenAt: Date | null;
+            lastSeenAt: Date | null;
+            heartbeatIntervalSeconds: number;
+            offlineTimeoutSeconds: number;
+            provisionedAt: Date | null;
+            rotatedAt: Date | null;
+            createdAt: Date;
+            updatedAt: Date;
+        };
+        apiKey: string;
+        provisioning: {
+            endpoint: string;
+            heartbeatEndpoint: string;
+            authorization: string;
+            deviceIdentifier: string;
+            heartbeatIntervalSeconds: number;
+            offlineTimeoutSeconds: number;
+            requiresHttpsInProduction: boolean;
+        };
+    }>;
+    private safe;
+    private provisioning;
+    private enrollable;
+    private validateIntervals;
+    private getEntity;
+    private assertAdmin;
 }

@@ -8,46 +8,61 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var __param = (this && this.__param) || function (paramIndex, decorator) {
-    return function (target, key) { decorator(target, key, paramIndex); }
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.JwtAuthGuard = void 0;
 const common_1 = require("@nestjs/common");
-const passport_1 = require("@nestjs/passport");
-const typeorm_1 = require("@nestjs/typeorm");
-const typeorm_2 = require("typeorm");
-const token_blacklist_entity_1 = require("../../modules/auth/token-blacklist.entity");
-const user_entity_1 = require("../../modules/users/user.entity");
-let JwtAuthGuard = class JwtAuthGuard extends (0, passport_1.AuthGuard)('jwt') {
-    tokenBlacklistRepository;
-    userRepository;
-    constructor(tokenBlacklistRepository, userRepository) {
-        super();
-        this.tokenBlacklistRepository = tokenBlacklistRepository;
-        this.userRepository = userRepository;
+const auth_session_service_1 = require("../../modules/auth/auth-session.service");
+const entitlement_service_1 = require("../../modules/billing/entitlement.service");
+const user_role_enum_1 = require("../enums/user-role.enum");
+let JwtAuthGuard = class JwtAuthGuard {
+    sessions;
+    entitlements;
+    constructor(sessions, entitlements) {
+        this.sessions = sessions;
+        this.entitlements = entitlements;
     }
     async canActivate(context) {
-        const active = await super.canActivate(context);
-        if (!active) {
-            return false;
-        }
         const req = context.switchToHttp().getRequest();
-        const authHeader = req.headers.authorization ?? '';
-        const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
-        if (!token) {
+        const authorization = req.headers.authorization ?? '';
+        if (!authorization.startsWith('Bearer '))
             throw new common_1.UnauthorizedException('Missing bearer token');
-        }
-        const blacklisted = await this.tokenBlacklistRepository.findOne({ where: { token } });
-        if (blacklisted) {
-            throw new common_1.UnauthorizedException('Token has been invalidated');
-        }
-        const user = await this.userRepository.findOne({ where: { id: req.user?.sub } });
-        if (!user || !user.isActive) {
-            throw new common_1.UnauthorizedException('User not active');
-        }
-        if ((req.user?.tokenVersion ?? 0) !== user.tokenVersion) {
-            throw new common_1.UnauthorizedException('Session expired');
+        const { user } = await this.sessions.validate(authorization.slice(7).trim());
+        req.user = {
+            sub: user.id,
+            role: user.role,
+            organizationId: user.organizationId,
+        };
+        if (user.role === user_role_enum_1.UserRole.CONTROLLER) {
+            const path = (req.originalUrl || '').split('?')[0];
+            const exempt = path.startsWith('/auth/') ||
+                path.startsWith('/billing/') ||
+                path.startsWith('/subscriptions/') ||
+                path === '/organizations/me' ||
+                path.startsWith('/notifications');
+            if (!exempt) {
+                let feature;
+                if (path.startsWith('/fuel/'))
+                    feature = path.includes('/estimates')
+                        ? 'fuel_estimates'
+                        : path.includes('/reconciliations') || path.includes('/adjustments')
+                            ? 'fuel_costs_reconciliation'
+                            : 'fuel_records';
+                else if (path.startsWith('/maintenance'))
+                    feature = 'maintenance';
+                else if (path.startsWith('/reports'))
+                    feature = /[?&]format=pdf(?:&|$)/.test(req.originalUrl || '')
+                        ? 'pdf_export'
+                        : path.includes('fleet') ||
+                            /[?&]type=fleet(?:&|$)/.test(req.originalUrl || '')
+                            ? 'fleet_analytics'
+                            : path.includes('operations') &&
+                                /[?&]type=(costs|reconciliation|maintenance|alerts|fleet)/.test(req.originalUrl || '')
+                                ? 'advanced_reports'
+                                : 'live_monitoring';
+                else
+                    feature = 'live_monitoring';
+                await this.entitlements.assert(user.organizationId, feature);
+            }
         }
         return true;
     }
@@ -55,9 +70,7 @@ let JwtAuthGuard = class JwtAuthGuard extends (0, passport_1.AuthGuard)('jwt') {
 exports.JwtAuthGuard = JwtAuthGuard;
 exports.JwtAuthGuard = JwtAuthGuard = __decorate([
     (0, common_1.Injectable)(),
-    __param(0, (0, typeorm_1.InjectRepository)(token_blacklist_entity_1.TokenBlacklist)),
-    __param(1, (0, typeorm_1.InjectRepository)(user_entity_1.User)),
-    __metadata("design:paramtypes", [typeorm_2.Repository,
-        typeorm_2.Repository])
+    __metadata("design:paramtypes", [auth_session_service_1.AuthSessionService,
+        entitlement_service_1.EntitlementService])
 ], JwtAuthGuard);
 //# sourceMappingURL=jwt-auth.guard.js.map

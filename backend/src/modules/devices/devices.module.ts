@@ -1,18 +1,28 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
-import { TokenBlacklist } from '../auth/token-blacklist.entity';
-import { SensorLog } from '../sensors/sensor-log.entity';
-import { User } from '../users/user.entity';
 import { Device } from './device.entity';
+import { DeviceBinding } from './device-binding.entity';
+import { DeviceKeyAudit } from './device-key-audit.entity';
 import { DevicesController } from './devices.controller';
 import { DevicesService } from './devices.service';
-
+import { Equipment } from '../equipment/equipment.entity';
+import { MonitoringModule } from '../monitoring/monitoring.module';
+import { Organization } from '../organizations/organization.entity';
+import { User } from '../users/user.entity';
 @Module({
-  imports: [TypeOrmModule.forFeature([Device, User, TokenBlacklist, SensorLog])],
+  imports: [
+    TypeOrmModule.forFeature([
+      Device,
+      DeviceBinding,
+      DeviceKeyAudit,
+      Equipment,
+      Organization,
+      User,
+    ]),
+    MonitoringModule,
+  ],
   controllers: [DevicesController],
-  providers: [DevicesService, JwtAuthGuard, RolesGuard],
+  providers: [DevicesService],
   exports: [DevicesService, TypeOrmModule],
 })
 export class DevicesModule {}

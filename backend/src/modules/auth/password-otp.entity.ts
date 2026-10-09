@@ -32,10 +32,16 @@ export class PasswordOtp {
   @Column({ default: false })
   used!: boolean;
 
+  @Column({ name: 'failed_attempts', default: 0 })
+  failedAttempts!: number;
+
   @Column({ name: 'user_id', type: 'uuid', nullable: true })
   userId!: string | null;
 
-  @ManyToOne(() => User, (user) => user.otps, { onDelete: 'CASCADE', nullable: true })
+  @ManyToOne(() => User, (user) => user.otps, {
+    onDelete: 'CASCADE',
+    nullable: true,
+  })
   @JoinColumn({ name: 'user_id' })
   user!: User | null;
 

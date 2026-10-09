@@ -1,4 +1,15 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
@@ -21,20 +32,30 @@ export class UsersController {
   @Post()
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
-  create(@Body() dto: CreateUserDto) {
-    return this.usersService.create(dto);
+  create(@Body() dto: CreateUserDto, @Req() req: { user: { sub: string } }) {
+    return this.usersService.create(dto, req.user.sub);
   }
 
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.CONTROLLER)
-  findAll() {
-    return this.usersService.findAll();
+  @Roles(UserRole.ADMIN)
+  findAll(
+    @Query('search') search?: string,
+    @Query('organizationId') organizationId?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.usersService.findAll(
+      search,
+      organizationId,
+      Number(page || 1),
+      Number(pageSize || 20),
+    );
   }
 
   @Get(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.ADMIN, UserRole.CONTROLLER, UserRole.USER)
+  @Roles(UserRole.ADMIN)
   findOne(@Param('id') id: string) {
     return this.usersService.findOne(id);
   }
@@ -49,14 +70,32 @@ export class UsersController {
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
-  deactivate(@Param('id') id: string) {
-    return this.usersService.deactivate(id);
+  deactivate(@Param('id') id: string, @Req() req: { user: { sub: string } }) {
+    return this.usersService.deactivate(id, req.user.sub);
+  }
+
+  @Post(':id/reactivate')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  reactivate(@Param('id') id: string, @Req() req: { user: { sub: string } }) {
+    return this.usersService.reactivate(id, req.user.sub);
+  }
+
+  @Post(':id/resend-invitation')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
+  resend(@Param('id') id: string) {
+    return this.usersService.resendInvitation(id);
   }
 
   @Post(':id/assign-devices')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(UserRole.ADMIN)
-  assignDevices(@Param('id') id: string, @Body() dto: AssignDevicesDto) {
-    return this.usersService.assignDevices(id, dto);
+  assignDevices(
+    @Param('id') id: string,
+    @Body() dto: AssignDevicesDto,
+    @Req() req: { user: { sub: string } },
+  ) {
+    return this.usersService.assignDevices(id, dto, req.user.sub);
   }
 }

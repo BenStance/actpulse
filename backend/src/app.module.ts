@@ -11,6 +11,12 @@ import { RealtimeModule } from './modules/realtime/realtime.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { SensorsModule } from './modules/sensors/sensors.module';
 import { UsersModule } from './modules/users/users.module';
+import { OrganizationsModule } from './modules/organizations/organizations.module';
+import { SitesModule } from './modules/sites/sites.module';
+import { EquipmentModule } from './modules/equipment/equipment.module';
+import { MonitoringModule } from './modules/monitoring/monitoring.module';
+import { OperationsModule } from './modules/operations/operations.module';
+import { BillingModule } from './modules/billing/billing.module';
 
 @Module({
   imports: [
@@ -34,7 +40,13 @@ import { UsersModule } from './modules/users/users.module';
     }),
     MailModule,
     AuthModule,
+    BillingModule,
     UsersModule,
+    OrganizationsModule,
+    MonitoringModule,
+    OperationsModule,
+    SitesModule,
+    EquipmentModule,
     DevicesModule,
     SensorsModule,
     RealtimeModule,

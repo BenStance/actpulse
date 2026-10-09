@@ -4,11 +4,21 @@ export class Phase1LogicSchema1746431000000 implements MigrationInterface {
   name = 'Phase1LogicSchema1746431000000';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "name" character varying NOT NULL DEFAULT 'Unknown User'`);
-    await queryRunner.query(`ALTER TABLE "users" ALTER COLUMN "password" DROP NOT NULL`);
-    await queryRunner.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "is_active" boolean NOT NULL DEFAULT true`);
-    await queryRunner.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "is_activated" boolean NOT NULL DEFAULT false`);
-    await queryRunner.query(`ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "token_version" integer NOT NULL DEFAULT 0`);
+    await queryRunner.query(
+      `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "name" character varying NOT NULL DEFAULT 'Unknown User'`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "users" ALTER COLUMN "password" DROP NOT NULL`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "is_active" boolean NOT NULL DEFAULT true`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "is_activated" boolean NOT NULL DEFAULT false`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "token_version" integer NOT NULL DEFAULT 0`,
+    );
 
     await queryRunner.query(`
       CREATE TABLE IF NOT EXISTS "user_devices" (
@@ -61,10 +71,18 @@ export class Phase1LogicSchema1746431000000 implements MigrationInterface {
     await queryRunner.query('DROP TABLE IF EXISTS "password_otps"');
     await queryRunner.query('DROP TYPE IF EXISTS "password_otps_purpose_enum"');
     await queryRunner.query('DROP TABLE IF EXISTS "user_devices"');
-    await queryRunner.query('ALTER TABLE "users" DROP COLUMN IF EXISTS "token_version"');
-    await queryRunner.query('ALTER TABLE "users" DROP COLUMN IF EXISTS "is_activated"');
-    await queryRunner.query('ALTER TABLE "users" DROP COLUMN IF EXISTS "is_active"');
-    await queryRunner.query('ALTER TABLE "users" ALTER COLUMN "password" SET NOT NULL');
+    await queryRunner.query(
+      'ALTER TABLE "users" DROP COLUMN IF EXISTS "token_version"',
+    );
+    await queryRunner.query(
+      'ALTER TABLE "users" DROP COLUMN IF EXISTS "is_activated"',
+    );
+    await queryRunner.query(
+      'ALTER TABLE "users" DROP COLUMN IF EXISTS "is_active"',
+    );
+    await queryRunner.query(
+      'ALTER TABLE "users" ALTER COLUMN "password" SET NOT NULL',
+    );
     await queryRunner.query('ALTER TABLE "users" DROP COLUMN IF EXISTS "name"');
   }
 }

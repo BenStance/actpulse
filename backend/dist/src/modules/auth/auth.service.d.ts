@@ -1,43 +1,90 @@
 import { JwtService } from '@nestjs/jwt';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { MailService } from '../mail/mail.service';
 import { User } from '../users/user.entity';
+import { AuthRateLimiterService } from './auth-rate-limiter.service';
+import { AuthSessionService } from './auth-session.service';
 import { ChangePasswordDto } from './dto/change-password.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { LoginDto } from './dto/login.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 import { PasswordOtp } from './password-otp.entity';
 import { TokenBlacklist } from './token-blacklist.entity';
 export declare class AuthService {
-    private readonly usersRepository;
-    private readonly otpRepository;
-    private readonly tokenBlacklistRepository;
-    private readonly jwtService;
-    private readonly mailService;
-    constructor(usersRepository: Repository<User>, otpRepository: Repository<PasswordOtp>, tokenBlacklistRepository: Repository<TokenBlacklist>, jwtService: JwtService, mailService: MailService);
-    seedAdmin(): Promise<void>;
-    login(dto: LoginDto): Promise<{
+    private readonly users;
+    private readonly otps;
+    private readonly blacklist;
+    private readonly dataSource;
+    private readonly jwt;
+    private readonly mail;
+    private readonly sessions;
+    private readonly rate;
+    private readonly logger;
+    constructor(users: Repository<User>, otps: Repository<PasswordOtp>, blacklist: Repository<TokenBlacklist>, dataSource: DataSource, jwt: JwtService, mail: MailService, sessions: AuthSessionService, rate: AuthRateLimiterService);
+    login(dto: LoginDto, ip: string): Promise<{
         accessToken: string;
         user: {
             id: string;
             name: string;
             email: string;
-            role: string;
+            role: import("../../common/enums/user-role.enum").UserRole;
+            organizationId: string | null;
+            isActive: boolean;
+            isActivated: boolean;
+            organization: {
+                id: string;
+                name: string;
+                isActive: boolean;
+            } | null;
+            equipmentIds: string[];
             deviceIds: string[];
         };
     }>;
-    logout(token: string): Promise<{
+    logout(token: string, userId: string): Promise<{
         message: string;
     }>;
-    forgotPassword(dto: ForgotPasswordDto): Promise<{
+    me(userId: string): Promise<{
+        id: string;
+        name: string;
+        email: string;
+        role: import("../../common/enums/user-role.enum").UserRole;
+        organizationId: string | null;
+        isActive: boolean;
+        isActivated: boolean;
+        organization: {
+            id: string;
+            name: string;
+            isActive: boolean;
+        } | null;
+        equipmentIds: string[];
+        deviceIds: string[];
+    }>;
+    updateProfile(userId: string, dto: UpdateProfileDto): Promise<{
+        id: string;
+        name: string;
+        email: string;
+        role: import("../../common/enums/user-role.enum").UserRole;
+        organizationId: string | null;
+        isActive: boolean;
+        isActivated: boolean;
+        organization: {
+            id: string;
+            name: string;
+            isActive: boolean;
+        } | null;
+        equipmentIds: string[];
+        deviceIds: string[];
+    }>;
+    forgotPassword(dto: ForgotPasswordDto, ip: string): Promise<{
         message: string;
     }>;
-    resetPassword(dto: ResetPasswordDto): Promise<{
+    resetPassword(dto: ResetPasswordDto, ip: string): Promise<{
         message: string;
     }>;
     changePassword(userId: string, dto: ChangePasswordDto): Promise<{
         message: string;
     }>;
-    private generateOtp;
     generateActivationToken(): string;
+    hashInvitation(token: string): string;
 }

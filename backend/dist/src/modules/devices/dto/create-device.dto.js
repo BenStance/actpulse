@@ -10,20 +10,70 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.CreateDeviceDto = void 0;
+const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
 class CreateDeviceDto {
+    organizationId;
+    siteId;
+    equipmentId;
     name;
-    location;
+    deviceIdentifier;
+    hardwareModel;
+    firmwareVersion;
+    heartbeatIntervalSeconds;
+    offlineTimeoutSeconds;
 }
 exports.CreateDeviceDto = CreateDeviceDto;
 __decorate([
+    (0, class_validator_1.IsUUID)('4'),
+    __metadata("design:type", String)
+], CreateDeviceDto.prototype, "organizationId", void 0);
+__decorate([
+    (0, class_validator_1.IsUUID)('4'),
+    __metadata("design:type", String)
+], CreateDeviceDto.prototype, "siteId", void 0);
+__decorate([
+    (0, class_validator_1.IsUUID)('4'),
+    __metadata("design:type", String)
+], CreateDeviceDto.prototype, "equipmentId", void 0);
+__decorate([
     (0, class_validator_1.IsString)(),
     (0, class_validator_1.MinLength)(2),
+    (0, class_validator_1.MaxLength)(160),
     __metadata("design:type", String)
 ], CreateDeviceDto.prototype, "name", void 0);
 __decorate([
     (0, class_validator_1.IsString)(),
-    (0, class_validator_1.MinLength)(2),
+    (0, class_validator_1.MinLength)(3),
+    (0, class_validator_1.MaxLength)(120),
     __metadata("design:type", String)
-], CreateDeviceDto.prototype, "location", void 0);
+], CreateDeviceDto.prototype, "deviceIdentifier", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(160),
+    __metadata("design:type", String)
+], CreateDeviceDto.prototype, "hardwareModel", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(100),
+    __metadata("design:type", String)
+], CreateDeviceDto.prototype, "firmwareVersion", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(10),
+    (0, class_validator_1.Max)(3600),
+    __metadata("design:type", Number)
+], CreateDeviceDto.prototype, "heartbeatIntervalSeconds", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_transformer_1.Type)(() => Number),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(30),
+    (0, class_validator_1.Max)(86400),
+    __metadata("design:type", Number)
+], CreateDeviceDto.prototype, "offlineTimeoutSeconds", void 0);
 //# sourceMappingURL=create-device.dto.js.map

@@ -5,19 +5,20 @@ import { Device } from '../devices/device.entity';
 import { HeartbeatDto } from './dto/heartbeat.dto';
 import { SensorStatusDto } from './dto/sensor-status.dto';
 import { SensorsService } from './sensors.service';
-
 @Controller('sensors')
 @UseGuards(DeviceApiKeyGuard)
 export class SensorsController {
-  constructor(private readonly sensorsService: SensorsService) {}
-
-  @Post('status')
-  pushStatus(@CurrentDevice() device: Device, @Body() dto: SensorStatusDto) {
-    return this.sensorsService.pushStatus(device, dto);
+  constructor(private readonly sensors: SensorsService) {}
+  @Post('status') status(
+    @CurrentDevice() device: Device,
+    @Body() dto: SensorStatusDto,
+  ) {
+    return this.sensors.pushStatus(device, dto);
   }
-
-  @Post('heartbeat')
-  heartbeat(@CurrentDevice() device: Device, @Body() _dto: HeartbeatDto) {
-    return this.sensorsService.heartbeat(device);
+  @Post('heartbeat') heartbeat(
+    @CurrentDevice() device: Device,
+    @Body() dto: HeartbeatDto,
+  ) {
+    return this.sensors.heartbeat(device, dto);
   }
 }

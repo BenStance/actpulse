@@ -8,14 +8,12 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.RealtimeModule = void 0;
 const common_1 = require("@nestjs/common");
-const jwt_1 = require("@nestjs/jwt");
 const realtime_gateway_1 = require("./realtime.gateway");
 let RealtimeModule = class RealtimeModule {
 };
 exports.RealtimeModule = RealtimeModule;
 exports.RealtimeModule = RealtimeModule = __decorate([
     (0, common_1.Module)({
-        imports: [jwt_1.JwtModule.register({})],
         providers: [realtime_gateway_1.RealtimeGateway],
         exports: [realtime_gateway_1.RealtimeGateway],
     })

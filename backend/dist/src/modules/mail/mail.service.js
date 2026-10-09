@@ -55,7 +55,7 @@ let MailService = MailService_1 = class MailService {
         this.configService = configService;
         this.transporter = nodemailer.createTransport({
             host: this.configService.get('EMAIL_HOST'),
-            port: this.configService.get('EMAIL_PORT'),
+            port: Number(this.configService.get('EMAIL_PORT')),
             secure: false,
             auth: {
                 user: this.configService.get('EMAIL_USER'),
@@ -79,7 +79,7 @@ let MailService = MailService_1 = class MailService {
             <path d="M10 18L15.5 23.5L26 13" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>`,
                 tag: 'INVITATION',
-                title: 'Welcome aboard,<br/>you\'re almost in.',
+                title: "Welcome aboard,<br/>you're almost in.",
                 subtitle: 'Your ActPulse monitoring workspace is ready — just one step away.',
                 body: `
           <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.7;">
@@ -211,13 +211,18 @@ let MailService = MailService_1 = class MailService {
             <div style="font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#6B7280;margin-bottom:12px;">
               Security Tips
             </div>
-            ${['Use a unique password you do not use elsewhere.', 'Enable two-factor authentication if available.', 'Never share your password with anyone, including support.']
-                    .map(tip => `
+            ${[
+                    'Use a unique password you do not use elsewhere.',
+                    'Enable two-factor authentication if available.',
+                    'Never share your password with anyone, including support.',
+                ]
+                    .map((tip) => `
                 <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;">
                   <div style="width:20px;height:20px;background:#D1FAE5;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px;font-size:11px;color:#065F46;">✓</div>
                   <p style="margin:0;font-size:13.5px;color:#4B5563;line-height:1.5;">${tip}</p>
                 </div>
-              `).join('')}
+              `)
+                    .join('')}
           </div>
 
           <!-- Warning -->
@@ -234,8 +239,7 @@ let MailService = MailService_1 = class MailService {
     async safeSend(payload) {
         const user = this.configService.get('EMAIL_USER');
         if (!user) {
-            this.logger.warn(`Email skipped. Missing EMAIL_USER. Target: ${payload.to}`);
-            return;
+            throw new Error('Email delivery is not configured');
         }
         await this.transporter.sendMail({
             from: `"ActPulse" <${user}>`,

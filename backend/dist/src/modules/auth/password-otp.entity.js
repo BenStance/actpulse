@@ -21,6 +21,7 @@ let PasswordOtp = class PasswordOtp {
     purpose;
     expiresAt;
     used;
+    failedAttempts;
     userId;
     user;
     createdAt;
@@ -55,11 +56,18 @@ __decorate([
     __metadata("design:type", Boolean)
 ], PasswordOtp.prototype, "used", void 0);
 __decorate([
+    (0, typeorm_1.Column)({ name: 'failed_attempts', default: 0 }),
+    __metadata("design:type", Number)
+], PasswordOtp.prototype, "failedAttempts", void 0);
+__decorate([
     (0, typeorm_1.Column)({ name: 'user_id', type: 'uuid', nullable: true }),
     __metadata("design:type", Object)
 ], PasswordOtp.prototype, "userId", void 0);
 __decorate([
-    (0, typeorm_1.ManyToOne)(() => user_entity_1.User, (user) => user.otps, { onDelete: 'CASCADE', nullable: true }),
+    (0, typeorm_1.ManyToOne)(() => user_entity_1.User, (user) => user.otps, {
+        onDelete: 'CASCADE',
+        nullable: true,
+    }),
     (0, typeorm_1.JoinColumn)({ name: 'user_id' }),
     __metadata("design:type", Object)
 ], PasswordOtp.prototype, "user", void 0);

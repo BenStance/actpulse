@@ -13,18 +13,24 @@ exports.User = void 0;
 const typeorm_1 = require("typeorm");
 const device_entity_1 = require("../devices/device.entity");
 const password_otp_entity_1 = require("../auth/password-otp.entity");
+const organization_entity_1 = require("../organizations/organization.entity");
+const user_role_enum_1 = require("../../common/enums/user-role.enum");
+const equipment_entity_1 = require("../equipment/equipment.entity");
 let User = class User {
     id;
     name;
     email;
     password;
     role;
+    organizationId;
+    organization;
     isActive;
     isActivated;
     tokenVersion;
     createdAt;
     updatedAt;
     devices;
+    equipment;
     otps;
 };
 exports.User = User;
@@ -45,9 +51,21 @@ __decorate([
     __metadata("design:type", Object)
 ], User.prototype, "password", void 0);
 __decorate([
-    (0, typeorm_1.Column)(),
+    (0, typeorm_1.Column)({ type: 'varchar' }),
     __metadata("design:type", String)
 ], User.prototype, "role", void 0);
+__decorate([
+    (0, typeorm_1.Column)({ name: 'organization_id', type: 'uuid', nullable: true }),
+    __metadata("design:type", Object)
+], User.prototype, "organizationId", void 0);
+__decorate([
+    (0, typeorm_1.ManyToOne)(() => organization_entity_1.Organization, (organization) => organization.users, {
+        nullable: true,
+        onDelete: 'RESTRICT',
+    }),
+    (0, typeorm_1.JoinColumn)({ name: 'organization_id' }),
+    __metadata("design:type", Object)
+], User.prototype, "organization", void 0);
 __decorate([
     (0, typeorm_1.Column)({ name: 'is_active', default: true }),
     __metadata("design:type", Boolean)
@@ -77,6 +95,15 @@ __decorate([
     }),
     __metadata("design:type", Array)
 ], User.prototype, "devices", void 0);
+__decorate([
+    (0, typeorm_1.ManyToMany)(() => equipment_entity_1.Equipment, (equipment) => equipment.users),
+    (0, typeorm_1.JoinTable)({
+        name: 'user_equipment',
+        joinColumn: { name: 'user_id', referencedColumnName: 'id' },
+        inverseJoinColumn: { name: 'equipment_id', referencedColumnName: 'id' },
+    }),
+    __metadata("design:type", Array)
+], User.prototype, "equipment", void 0);
 __decorate([
     (0, typeorm_1.OneToMany)(() => password_otp_entity_1.PasswordOtp, (otp) => otp.user),
     __metadata("design:type", Array)

@@ -1,5 +1,5 @@
 declare const _default: () => {
     port: number;
-    jwtSecret: string;
+    jwtSecret: string | undefined;
 };
 export default _default;

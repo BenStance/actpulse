@@ -1,508 +1,1279 @@
 // src/pages/admin/Users.jsx
-import { useEffect, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Link, 
-  Search, 
-  CheckCircle, 
-  XCircle,
-  UserPlus,
-  Cpu,
-  Mail,
-  User as UserIcon,
-  Shield,
+import { useEffect, useMemo, useState } from "react";
+import {
+  Ban,
+  Building2,
+  ChevronLeft,
   ChevronRight,
-  Calendar
-} from 'lucide-react';
-import { useThemeContext } from '../../context/ThemeContext';
-import PageContainer from '../../components/layout/PageContainer';
-import Button from '../../components/common/Button';
-import Input from '../../components/common/Input';
-import Modal from '../../components/common/Modal';
-import { deviceApi, usersApi } from '../../api/actPulse.Api';
+  ChevronsLeft,
+  ChevronsRight,
+  Clock,
+  Cpu,
+  Eye,
+  Filter,
+  Mail,
+  Pencil,
+  Phone,
+  RefreshCw,
+  RotateCcw,
+  Search,
+  ShieldCheck,
+  User as UserIcon,
+  UserCheck,
+  UserPlus,
+} from "lucide-react";
+import PageContainer from "../../components/layout/PageContainer";
+import Button from "../../components/common/Button";
+import Input from "../../components/common/Input";
+import Modal from "../../components/common/Modal";
+import {
+  equipmentApi,
+  organizationsApi,
+  usersApi,
+} from "../../api/actPulse.Api";
+import { formatDate } from "../../utils/formatDate";
 
-// Helper to format date
-const formatDate = (dateStr) => new Date(dateStr).toLocaleDateString();
+/* ------------------------------------------------------------------ */
+/*  Style tokens                                                      */
+/* ------------------------------------------------------------------ */
+const card =
+  "rounded-2xl border border-slate-200 bg-white shadow-sm transition-colors dark:border-slate-700 dark:bg-slate-900";
+const cardPad = `${card} p-4`;
+const sectionTitle =
+  "text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400";
+const selectClass =
+  "mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 outline-none transition-colors focus:border-[#427aa1] focus:ring-2 focus:ring-[#427aa1]/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100";
+const tableHead =
+  "bg-slate-50 dark:bg-slate-800/60 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400";
+const tableCell = "p-3 text-sm text-slate-700 dark:text-slate-200";
 
-// Status badge component
-function StatusBadge({ isActive, isActivated }) {
-  if (!isActive) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-red-500/20 px-2 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
-        <XCircle size={12} />Inactive
-      </span>
-    );
-  }
-  if (isActivated) {
-    return (
-      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:text-emerald-400">
-        <CheckCircle size={12} />Active
-      </span>
-    );
-  }
+const PAGE_SIZES = [10, 20, 50, 100];
+
+const initialInvite = {
+  name: "",
+  email: "",
+  phone: "",
+  organizationId: "",
+  equipmentIds: [],
+};
+
+const initialEdit = {
+  name: "",
+  email: "",
+  phone: "",
+  role: "",
+  organizationId: "",
+};
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                           */
+/* ------------------------------------------------------------------ */
+function statusOf(user) {
+  if (!user.isActive) return "Inactive";
+  return user.isActivated ? "Active" : "Pending invitation";
+}
+
+function statusStyle(user) {
+  if (!user.isActive)
+    return {
+      pill: "bg-slate-100 text-slate-600 ring-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:ring-slate-700",
+      dot: "bg-slate-400",
+    };
+  if (!user.isActivated)
+    return {
+      pill: "bg-amber-50 text-amber-700 ring-amber-200 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/30",
+      dot: "bg-amber-500",
+    };
+  return {
+    pill: "bg-emerald-50 text-emerald-700 ring-emerald-200 dark:bg-emerald-500/10 dark:text-emerald-300 dark:ring-emerald-500/30",
+    dot: "bg-emerald-500",
+  };
+}
+
+function initials(name) {
+  if (!name) return "?";
+  return name
+    .split(/[\s@.]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((s) => s[0]?.toUpperCase())
+    .join("");
+}
+
+/* ------------------------------------------------------------------ */
+/*  Detail row primitives                                             */
+/* ------------------------------------------------------------------ */
+function DetailRow({ label, value, icon: Icon }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-yellow-500/20 px-2 py-0.5 text-xs font-medium text-yellow-700 dark:text-yellow-400">
-      Pending
-    </span>
+    <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-3 dark:border-slate-700 dark:bg-slate-800/40">
+      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+        {Icon && <Icon size={12} />}
+        {label}
+      </div>
+      <p className="mt-1 break-words text-sm font-medium text-slate-800 dark:text-slate-100">
+        {value || "—"}
+      </p>
+    </div>
   );
 }
 
-// ─── Mobile User Card ────────────────────────────────────────────────────────
-function UserCard({ user, onEdit, onAssign, onDeactivate }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.2 }}
-      className="rounded-2xl border border-slate-200 bg-white/80 p-4 backdrop-blur-md dark:border-slate-700 dark:bg-slate-800/40"
-    >
-      {/* Top row: name + status */}
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <div className="min-w-0">
-          <p className="truncate font-semibold text-slate-800 dark:text-white">{user.name}</p>
-          <p className="truncate text-sm text-slate-500 dark:text-slate-400">{user.email}</p>
+  /* ---------- selectable equipment list ---------- */
+function EquipmentPicker({ ids, setIds, availableEquipment, filteredEquipment, assignmentSearch, setAssignmentSearch }) {
+    const toggle = (id) =>
+      setIds((old) =>
+        old.includes(id) ? old.filter((x) => x !== id) : [...old, id]
+      );
+    const allSelected =
+      filteredEquipment.length > 0 &&
+      filteredEquipment.every((d) => ids.includes(d.id));
+
+    if (!availableEquipment.length) {
+      return (
+        <div className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+          No equipment in this organization yet.
         </div>
-        <StatusBadge isActive={user.isActive} isActivated={user.isActivated} />
-      </div>
+      );
+    }
 
-      {/* Meta row */}
-      <div className="flex flex-wrap gap-3 text-xs text-slate-500 dark:text-slate-400 mb-4">
-        <span className="inline-flex items-center gap-1 rounded-full bg-[#064789]/10 px-2 py-0.5 font-medium text-[#064789] dark:bg-[#427aa1]/20 dark:text-[#427aa1]">
-          <Shield size={11} /> {user.role}
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <Cpu size={12} /> {user.devices?.length || 0} device{user.devices?.length !== 1 ? 's' : ''}
-        </span>
-        <span className="inline-flex items-center gap-1">
-          <Calendar size={12} /> {formatDate(user.createdAt)}
-        </span>
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <div className="relative flex-1">
+            <Search
+              size={14}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              type="text"
+              placeholder="Search equipment…"
+              value={assignmentSearch}
+              onChange={(e) => setAssignmentSearch(e.target.value)}
+              className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-[#427aa1] focus:ring-2 focus:ring-[#427aa1]/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={() =>
+              setIds(allSelected ? [] : filteredEquipment.map((d) => d.id))
+            }
+            className="shrink-0 rounded-lg border border-slate-200 px-2.5 py-2 text-xs font-medium text-slate-600 hover:border-[#427aa1] hover:text-[#064789] dark:border-slate-700 dark:text-slate-300 dark:hover:text-[#8fc7e8]"
+          >
+            {allSelected ? "Clear all" : "Select all"}
+          </button>
+        </div>
+        <div className="max-h-64 space-y-1 overflow-y-auto rounded-xl border border-slate-200 p-2 dark:border-slate-700">
+          {filteredEquipment.length === 0 ? (
+            <p className="p-3 text-center text-xs text-slate-400">
+              No matches for "{assignmentSearch}".
+            </p>
+          ) : (
+            filteredEquipment.map((device) => {
+              const checked = ids.includes(device.id);
+              return (
+                <label
+                  key={device.id}
+                  className={`flex cursor-pointer items-center gap-3 rounded-lg p-2.5 text-sm transition-colors ${
+                    checked
+                      ? "bg-[#064789]/5 dark:bg-[#427aa1]/10"
+                      : "hover:bg-slate-50 dark:hover:bg-slate-800/60"
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggle(device.id)}
+                    className="h-4 w-4 rounded border-slate-300 text-[#064789] focus:ring-[#427aa1] dark:border-slate-600 dark:bg-slate-800"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-slate-800 dark:text-slate-100">
+                      {device.name}
+                    </p>
+                    <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                      {device.site?.name || device.type || "No site"}
+                    </p>
+                  </div>
+                  <Cpu size={14} className="shrink-0 text-slate-400" />
+                </label>
+              );
+            })
+          )}
+        </div>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          {ids.length} of {availableEquipment.length} equipment selected
+        </p>
       </div>
-
-      {/* Actions */}
-      <div className="flex gap-2 border-t border-slate-100 pt-3 dark:border-slate-700">
-        <button
-          onClick={() => onEdit(user)}
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors"
-        >
-          <Edit size={13} /> Edit
-        </button>
-        <button
-          onClick={() => onAssign(user)}
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-700 transition-colors"
-        >
-          <Link size={13} /> Assign
-        </button>
-        <button
-          onClick={() => onDeactivate(user)}
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium text-red-500 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 transition-colors"
-        >
-          <Trash2 size={13} /> Deactivate
-        </button>
-      </div>
-    </motion.div>
-  );
+    );
 }
 
+/* ================================================================== */
+/*  Users (Controllers)                                               */
+/* ================================================================== */
 export default function Users() {
-  const { darkMode } = useThemeContext();
+  /* ---------- list state ---------- */
   const [users, setUsers] = useState([]);
-  const [devices, setDevices] = useState([]);
+  const [organizations, setOrganizations] = useState([]);
+  const [equipment, setEquipment] = useState([]);
+  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [organizationId, setOrganizationId] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [selectedUser, setSelectedUser] = useState(null);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
-  // Modals state
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showAssignModal, setShowAssignModal] = useState(false);
-  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
-  const [actionLoading, setActionLoading] = useState(false);
-  const [error, setError] = useState('');
+  /* ---------- modal state ---------- */
+  const [modal, setModal] = useState("");
+  const [selected, setSelected] = useState(null);
+  const [invite, setInvite] = useState(initialInvite);
+  const [edit, setEdit] = useState(initialEdit);
+  const [assignedIds, setAssignedIds] = useState([]);
+  const [assignmentSearch, setAssignmentSearch] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [modalError, setModalError] = useState("");
 
-  // Form states
-  const [createForm, setCreateForm] = useState({ name: '', email: '', role: 'Controller', deviceIds: [] });
-  const [editForm, setEditForm] = useState({ name: '', role: 'Controller' });
-  const [assignForm, setAssignForm] = useState({ deviceIds: [] });
-  const [createDeviceMenuOpen, setCreateDeviceMenuOpen] = useState(false);
-  const [assignDeviceMenuOpen, setAssignDeviceMenuOpen] = useState(false);
-
-  const loadData = async () => {
+  /* ---------- data loading ---------- */
+  const load = async (nextPage = page, nextPageSize = pageSize) => {
     setLoading(true);
+    setError("");
     try {
-      const [usersRes, devicesRes] = await Promise.all([usersApi.list(), deviceApi.list()]);
-      setUsers(usersRes.data || []);
-      setDevices(devicesRes.data || []);
+      const [usersRes, orgsRes, equipmentRes] = await Promise.all([
+        usersApi.list({
+          search: search || undefined,
+          organizationId: organizationId || undefined,
+          status: statusFilter || undefined,
+          page: nextPage,
+          pageSize: nextPageSize,
+        }),
+        organizationsApi.list(),
+        equipmentApi.list({ active: "all" }),
+      ]);
+      setUsers(usersRes.data.items || []);
+      setTotal(
+        usersRes.data.total ?? usersRes.data.totalCount ?? usersRes.data.items?.length ?? 0
+      );
+      setPage(usersRes.data.page ?? nextPage);
+      setOrganizations(orgsRes.data || []);
+      setEquipment(equipmentRes.data || []);
     } catch (err) {
-      console.error(err);
-      setError('Failed to load data');
+      setError(
+        err?.response?.data?.message || "Could not load Controllers."
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      setLoading(true);
+      try {
+        const [usersRes, orgsRes, equipmentRes] = await Promise.all([
+          usersApi.list({ page: 1, pageSize: 20 }),
+          organizationsApi.list(),
+          equipmentApi.list({ active: "all" }),
+        ]);
+        if (!active) return;
+        setUsers(usersRes.data.items || []);
+        setTotal(
+          usersRes.data.total ??
+            usersRes.data.totalCount ??
+            usersRes.data.items?.length ??
+            0
+        );
+        setOrganizations(orgsRes.data || []);
+        setEquipment(equipmentRes.data || []);
+      } catch (err) {
+        if (active)
+          setError(
+            err?.response?.data?.message || "Could not load Controllers."
+          );
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
 
-  // Create user
-  const handleCreate = async (e) => {
-    e.preventDefault();
-    setActionLoading(true);
-    setError('');
+  const applySearch = () => {
+    setSearch(searchInput);
+    setPage(1);
+    void load(1, pageSize);
+  };
+
+  /* ---------- modal openers ---------- */
+  const openInvite = () => {
+    setInvite(initialInvite);
+    setSelected(null);
+    setModalError("");
+    setModal("invite");
+  };
+  const openView = (user) => {
+    setSelected(user);
+    setModalError("");
+    setModal("view");
+  };
+  const openEdit = (user) => {
+    setSelected(user);
+    setEdit({
+      name: user.name || "",
+      email: user.email || "",
+      phone: user.phone || "",
+      role: user.role || "CONTROLLER",
+      organizationId: user.organization?.id || user.organizationId || "",
+    });
+    setModalError("");
+    setModal("edit");
+  };
+  const openAssign = (user) => {
+    setSelected(user);
+    setAssignedIds(user.equipmentIds || user.equipment?.map((e) => e.id) || []);
+    setAssignmentSearch("");
+    setModalError("");
+    setModal("assign");
+  };
+  const openDeactivate = (user) => {
+    setSelected(user);
+    setModalError("");
+    setModal("deactivate");
+  };
+  const openReactivate = (user) => {
+    setSelected(user);
+    setModalError("");
+    setModal("reactivate");
+  };
+
+  const closeModal = () => {
+    if (busy) return;
+    setModal("");
+    setModalError("");
+  };
+
+  /* ---------- mutations ---------- */
+  const act = async (action, message) => {
+    setBusy(true);
+    setModalError("");
     try {
-      await usersApi.create(createForm);
-      setShowCreateModal(false);
-      setCreateForm({ name: '', email: '', role: 'Controller', deviceIds: [] });
-      loadData();
+      await action();
+      setModal("");
+      setSuccess(message);
+      await load(page, pageSize);
+      setTimeout(() => setSuccess(""), 4000);
     } catch (err) {
-      setError(err?.response?.data?.message || 'Failed to invite user');
+      setModalError(
+        err?.response?.data?.message || "Action failed."
+      );
     } finally {
-      setActionLoading(false);
+      setBusy(false);
     }
   };
 
-  // Update user (name, role)
-  const handleUpdate = async () => {
-    if (!selectedUser) return;
-    setActionLoading(true);
-    setError('');
-    try {
-      await usersApi.update(selectedUser.id, editForm);
-      setShowEditModal(false);
-      loadData();
-    } catch (err) {
-      setError(err?.response?.data?.message || 'Failed to update user');
-    } finally {
-      setActionLoading(false);
-    }
+  const submitInvite = (event) => {
+    event.preventDefault();
+    void act(() => usersApi.create(invite), "Invitation sent.");
+  };
+  const submitEdit = (event) => {
+    event.preventDefault();
+    void act(
+      () =>
+        usersApi.update(selected.id, {
+          name: edit.name.trim(),
+          email: edit.email.trim(),
+          phone: edit.phone?.trim() || undefined,
+          role: edit.role,
+          organizationId: edit.organizationId,
+        }),
+      "Controller updated."
+    );
+  };
+  const submitAssignments = () => {
+    void act(
+      () => usersApi.assignDevices(selected.id, { equipmentIds: assignedIds }),
+      "Assignments updated."
+    );
+  };
+  const confirmDeactivate = () => {
+    void act(
+      () => usersApi.remove(selected.id),
+      `Controller deactivated.`
+    );
+  };
+  const confirmReactivate = () => {
+    void act(
+      () => usersApi.reactivate(selected.id),
+      `Controller reactivated.`
+    );
   };
 
-  // Assign devices
-  const handleAssignDevices = async () => {
-    if (!selectedUser) return;
-    setActionLoading(true);
-    setError('');
-    try {
-      await usersApi.assignDevices(selectedUser.id, { deviceIds: assignForm.deviceIds });
-      setShowAssignModal(false);
-      loadData();
-    } catch (err) {
-      setError(err?.response?.data?.message || 'Failed to assign devices');
-    } finally {
-      setActionLoading(false);
-    }
+  /* ---------- derived ---------- */
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const fromIndex =
+    total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const toIndex = Math.min(page * pageSize, total);
+
+  const goTo = (p) => {
+    const next = Math.max(1, Math.min(totalPages, p));
+    if (next !== page) void load(next, pageSize);
   };
 
-  // Deactivate user
-  const handleDeactivate = async () => {
-    if (!selectedUser) return;
-    setActionLoading(true);
-    setError('');
-    try {
-      await usersApi.remove(selectedUser.id);
-      setShowDeactivateModal(false);
-      loadData();
-    } catch (err) {
-      setError(err?.response?.data?.message || 'Failed to deactivate user');
-    } finally {
-      setActionLoading(false);
-    }
+  const changePageSize = (size) => {
+    setPageSize(size);
+    setPage(1);
+    void load(1, size);
   };
 
-  // Filter users by search
-  const filteredUsers = users.filter(u =>
-    u.name?.toLowerCase().includes(search.toLowerCase()) ||
-    u.email?.toLowerCase().includes(search.toLowerCase())
-  );
+  /* ---------- equipment for current scope ---------- */
+  const availableEquipment = useMemo(() => {
+    const orgId =
+      modal === "invite"
+        ? invite.organizationId
+        : modal === "edit"
+          ? edit.organizationId
+          : selected?.organization?.id || selected?.organizationId;
+    return equipment.filter((d) => !orgId || d.organizationId === orgId);
+  }, [equipment, modal, invite.organizationId, edit.organizationId, selected]);
 
-  // Helper to open modals
-  const openEditModal = (user) => {
-    setSelectedUser(user);
-    setEditForm({ name: user.name, role: user.role });
-    setShowEditModal(true);
-    setError('');
-  };
+  const filteredEquipment = useMemo(() => {
+    if (!assignmentSearch.trim()) return availableEquipment;
+    const q = assignmentSearch.toLowerCase();
+    return availableEquipment.filter(
+      (d) =>
+        d.name?.toLowerCase().includes(q) ||
+        d.site?.name?.toLowerCase().includes(q) ||
+        d.type?.toLowerCase().includes(q)
+    );
+  }, [availableEquipment, assignmentSearch]);
 
-  const openAssignModal = (user) => {
-    setSelectedUser(user);
-    const currentDeviceIds = user.devices?.map(d => d.id) || [];
-    setAssignForm({ deviceIds: currentDeviceIds });
-    setShowAssignModal(true);
-    setAssignDeviceMenuOpen(false);
-    setError('');
-  };
-
-  const openDeactivateModal = (user) => {
-    setSelectedUser(user);
-    setShowDeactivateModal(true);
-    setError('');
-  };
-
-  // ── Shared loading / empty states ──────────────────────────────────────────
-  const LoadingState = () => (
-    <div className="flex justify-center py-12">
-      <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#064789] border-t-transparent dark:border-[#427aa1]" />
-    </div>
-  );
-
-  const EmptyState = () => (
-    <div className="py-12 text-center text-slate-500 dark:text-slate-400">No users found</div>
-  );
-
+  /* ================================================================ */
   return (
-    <PageContainer title="Users" subtitle="Invite, manage and assign devices to users">
-      {/* Header: search + invite button */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
-        <div className="flex-1 min-w-[180px] relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <Input
-            placeholder="Search by name or email..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9 w-full"
-          />
-        </div>
-        <Button onClick={() => setShowCreateModal(true)} className="gap-2 w-auto shrink-0">
-          <UserPlus size={16} /> Invite User
-        </Button>
-      </div>
+    <PageContainer
+      title="Controllers"
+      subtitle="Invite, manage and assign customer accounts"
+    >
+      <div className="space-y-4">
+        {/* ============ FILTERS ============ */}
+        <section className={card} aria-label="User filters">
+          <header className="flex items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 dark:border-slate-800">
+            <div className="flex items-center gap-2">
+              <Filter size={16} className="text-slate-400" />
+              <h2 className={sectionTitle}>Filters</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setSearchInput("");
+                setSearch("");
+                setOrganizationId("");
+                setStatusFilter("");
+                setPage(1);
+                void load(1, pageSize);
+              }}
+              className="text-xs font-medium text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-100"
+            >
+              Reset
+            </button>
+          </header>
 
-      {/* ── MOBILE: Card list (hidden on md+) ────────────────────────────── */}
-      <div className="flex flex-col gap-3 md:hidden">
-        {loading ? (
-          <LoadingState />
-        ) : filteredUsers.length === 0 ? (
-          <EmptyState />
-        ) : (
-          filteredUsers.map((user) => (
-            <UserCard
-              key={user.id}
-              user={user}
-              onEdit={openEditModal}
-              onAssign={openAssignModal}
-              onDeactivate={openDeactivateModal}
-            />
-          ))
+          <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="lg:col-span-2">
+              <label className="text-sm">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  Search
+                </span>
+                <div className="relative mt-1">
+                  <Search
+                    size={14}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Name, email…"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && applySearch()}
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-[#427aa1] focus:ring-2 focus:ring-[#427aa1]/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  />
+                </div>
+              </label>
+            </div>
+            <label className="text-sm">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                Organization
+              </span>
+              <select
+                className={selectClass}
+                value={organizationId}
+                onChange={(e) => {
+                  setOrganizationId(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="">All organizations</option>
+                {organizations.map((org) => (
+                  <option key={org.id} value={org.id}>
+                    {org.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                Status
+              </span>
+              <select
+                className={selectClass}
+                value={statusFilter}
+                onChange={(e) => {
+                  setStatusFilter(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="">All statuses</option>
+                <option value="active">Active</option>
+                <option value="pending">Pending invitation</option>
+                <option value="inactive">Inactive</option>
+              </select>
+            </label>
+          </div>
+        </section>
+
+        {/* ============ TOOLBAR ============ */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="text-xs text-slate-500 dark:text-slate-400">
+            {loading
+              ? "Loading…"
+              : total === 0
+                ? "No records"
+                : `Showing ${fromIndex}–${toIndex} of ${total}`}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={applySearch}
+              disabled={loading}
+              leftIcon={Search}
+            >
+              Search
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void load(page, pageSize)}
+              disabled={loading}
+              leftIcon={RefreshCw}
+            >
+              Refresh
+            </Button>
+            <Button
+              size="sm"
+              onClick={openInvite}
+              leftIcon={UserPlus}
+            >
+              Invite Controller
+            </Button>
+          </div>
+        </div>
+
+        {/* ============ MESSAGES ============ */}
+        {error && (
+          <p
+            role="alert"
+            className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300"
+          >
+            {error}
+          </p>
         )}
-      </div>
+        {success && (
+          <p
+            role="status"
+            className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300"
+          >
+            {success}
+          </p>
+        )}
 
-      {/* ── DESKTOP: Full table (hidden below md) ────────────────────────── */}
-      <div className="hidden md:block rounded-2xl border border-slate-200 bg-white/80 backdrop-blur-md dark:border-slate-700 dark:bg-slate-800/40">
-        <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
-          <thead className="bg-slate-50/50 dark:bg-slate-800/80">
-            <tr>
-              {['Name', 'Email', 'Role', 'Status', 'Devices', 'Created', 'Actions'].map((h, i) => (
-                <th
-                  key={h}
-                  className={`px-4 py-3 text-xs font-medium uppercase tracking-wider text-slate-500 dark:text-slate-400 ${i === 6 ? 'text-right' : 'text-left'}`}
+        {/* ============ TABLE ============ */}
+        {loading ? (
+          <div className={`${cardPad} flex items-center justify-center py-16`}>
+            <div className="flex flex-col items-center gap-3">
+              <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-slate-200 border-t-[#064789] dark:border-slate-700 dark:border-t-[#427aa1]" />
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Loading Controllers…
+              </p>
+            </div>
+          </div>
+        ) : users.length === 0 ? (
+          <div className={`${cardPad} flex flex-col items-center justify-center py-16 text-center`}>
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-slate-800">
+              <UserIcon size={22} />
+            </div>
+            <p className="text-sm font-medium text-slate-600 dark:text-slate-300">
+              No Controllers found
+            </p>
+            <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+              Create an organization, then invite a Controller.
+            </p>
+            <Button size="sm" className="mt-4" onClick={openInvite} leftIcon={UserPlus}>
+              Invite Controller
+            </Button>
+          </div>
+        ) : (
+          <section className={card}>
+            <div className="overflow-x-auto">
+              <table className="min-w-[1000px] w-full text-left text-sm">
+                <thead>
+                  <tr className={tableHead}>
+                    <th className="p-3">Controller</th>
+                    <th className="p-3">Organization</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3">Assigned equipment</th>
+                    <th className="p-3">Last active</th>
+                    <th className="p-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((user) => {
+                    const s = statusStyle(user);
+                    const equipmentCount =
+                      user.equipment?.length ?? user.equipmentIds?.length ?? 0;
+                    return (
+                      <tr
+                        key={user.id}
+                        className="border-t border-slate-100 transition-colors hover:bg-slate-50/60 dark:border-slate-800 dark:hover:bg-slate-800/40"
+                      >
+                        <td className={tableCell}>
+                          <div className="flex items-center gap-3">
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#064789] to-[#427aa1] text-xs font-bold text-white">
+                              {initials(user.name)}
+                            </span>
+                            <div className="min-w-0">
+                              <p className="truncate font-medium text-slate-800 dark:text-slate-100">
+                                {user.name}
+                              </p>
+                              <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                                {user.email}
+                              </p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className={tableCell}>
+                          <div className="flex items-center gap-1.5">
+                            <Building2 size={14} className="text-slate-400" />
+                            <span className="truncate">
+                              {user.organization?.name || "—"}
+                            </span>
+                          </div>
+                        </td>
+                        <td className={tableCell}>
+                          <span
+                            className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ring-1 ring-inset ${s.pill}`}
+                          >
+                            <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
+                            {statusOf(user)}
+                          </span>
+                        </td>
+                        <td className={tableCell}>
+                          <span className="inline-flex items-center gap-1.5 text-slate-700 dark:text-slate-200">
+                            <Cpu size={14} className="text-slate-400" />
+                            {equipmentCount}
+                          </span>
+                        </td>
+                        <td className={tableCell}>
+                          <span className="text-xs text-slate-500 dark:text-slate-400">
+                            {user.lastActiveAt
+                              ? formatDate(user.lastActiveAt, "UTC")
+                              : "—"}
+                          </span>
+                        </td>
+                        <td className={`${tableCell} text-right`}>
+                          <div className="flex flex-wrap items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => openView(user)}
+                              title="View details"
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-[#427aa1] hover:text-[#064789] dark:border-slate-700 dark:text-slate-200 dark:hover:border-[#427aa1] dark:hover:text-[#8fc7e8]"
+                            >
+                              <Eye size={13} />
+                              View
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openEdit(user)}
+                              title="Edit"
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-[#427aa1] hover:text-[#064789] dark:border-slate-700 dark:text-slate-200 dark:hover:border-[#427aa1] dark:hover:text-[#8fc7e8]"
+                            >
+                              <Pencil size={13} />
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => openAssign(user)}
+                              title="Assign equipment"
+                              className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs font-medium text-slate-700 transition-colors hover:border-[#427aa1] hover:text-[#064789] dark:border-slate-700 dark:text-slate-200 dark:hover:border-[#427aa1] dark:hover:text-[#8fc7e8]"
+                            >
+                              <Cpu size={13} />
+                              Assign
+                            </button>
+                            {user.isActive ? (
+                              <button
+                                type="button"
+                                onClick={() => openDeactivate(user)}
+                                title="Deactivate"
+                                className="inline-flex items-center gap-1 rounded-lg border border-rose-200 px-2.5 py-1.5 text-xs font-medium text-rose-600 transition-colors hover:bg-rose-50 dark:border-rose-900/40 dark:text-rose-400 dark:hover:bg-rose-950/30"
+                              >
+                                <Ban size={13} />
+                                Deactivate
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => openReactivate(user)}
+                                title="Reactivate"
+                                className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 px-2.5 py-1.5 text-xs font-medium text-emerald-700 transition-colors hover:bg-emerald-50 dark:border-emerald-900/40 dark:text-emerald-400 dark:hover:bg-emerald-950/30"
+                              >
+                                <RotateCcw size={13} />
+                                Reactivate
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* ============ PAGER ============ */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 dark:border-slate-800">
+              <span className="text-xs text-slate-500 dark:text-slate-400">
+                Page{" "}
+                <strong className="text-slate-700 dark:text-slate-200">
+                  {page}
+                </strong>{" "}
+                of {totalPages} · {total} Controllers
+              </span>
+              <div className="flex items-center gap-3">
+                <label className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                  Rows
+                  <select
+                    value={pageSize}
+                    onChange={(e) => changePageSize(Number(e.target.value))}
+                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-700 outline-none focus:border-[#427aa1] focus:ring-2 focus:ring-[#427aa1]/30 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100"
+                  >
+                    {PAGE_SIZES.map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => goTo(1)}
+                    disabled={page <= 1}
+                    className="rounded-lg border border-slate-200 p-1.5 text-slate-500 transition-colors hover:border-[#427aa1] hover:text-[#064789] disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300"
+                    aria-label="First page"
+                  >
+                    <ChevronsLeft size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => goTo(page - 1)}
+                    disabled={page <= 1}
+                    className="rounded-lg border border-slate-200 p-1.5 text-slate-500 transition-colors hover:border-[#427aa1] hover:text-[#064789] disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300"
+                    aria-label="Previous page"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => goTo(page + 1)}
+                    disabled={page >= totalPages}
+                    className="rounded-lg border border-slate-200 p-1.5 text-slate-500 transition-colors hover:border-[#427aa1] hover:text-[#064789] disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300"
+                    aria-label="Next page"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => goTo(totalPages)}
+                    disabled={page >= totalPages}
+                    className="rounded-lg border border-slate-200 p-1.5 text-slate-500 transition-colors hover:border-[#427aa1] hover:text-[#064789] disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:text-slate-300"
+                    aria-label="Last page"
+                  >
+                    <ChevronsRight size={14} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ============ INVITE MODAL ============ */}
+        <Modal
+          open={modal === "invite"}
+          onClose={closeModal}
+          title="Invite Controller"
+          size="lg"
+        >
+          <form onSubmit={submitInvite} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Input
+                label="Full name"
+                value={invite.name}
+                onChange={(e) => setInvite({ ...invite, name: e.target.value })}
+                required
+                icon={UserIcon}
+              />
+              <Input
+                label="Email"
+                type="email"
+                value={invite.email}
+                onChange={(e) => setInvite({ ...invite, email: e.target.value })}
+                required
+                icon={Mail}
+              />
+              <Input
+                label="Phone (optional)"
+                value={invite.phone}
+                onChange={(e) => setInvite({ ...invite, phone: e.target.value })}
+                icon={Phone}
+              />
+              <label className="text-sm">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  Organization
+                </span>
+                <select
+                  required
+                  className={selectClass}
+                  value={invite.organizationId}
+                  onChange={(e) =>
+                    setInvite({
+                      ...invite,
+                      organizationId: e.target.value,
+                      equipmentIds: [],
+                    })
+                  }
                 >
-                  {h}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-            {loading ? (
-              <tr>
-                <td colSpan="7" className="px-4 py-8 text-center">
-                  <LoadingState />
-                </td>
-              </tr>
-            ) : filteredUsers.length === 0 ? (
-              <tr>
-                <td colSpan="7" className="px-4 py-8">
-                  <EmptyState />
-                </td>
-              </tr>
-            ) : (
-              filteredUsers.map((user) => (
-                <motion.tr
-                  key={user.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.2 }}
-                  className="hover:bg-slate-50/50 dark:hover:bg-slate-700/30"
-                >
-                  <td className="whitespace-nowrap px-4 py-3 text-sm font-medium text-slate-800 dark:text-white">{user.name}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-600 dark:text-slate-300">{user.email}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-sm">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-[#064789]/10 px-2 py-0.5 text-xs font-medium text-[#064789] dark:bg-[#427aa1]/20 dark:text-[#427aa1]">
-                      <Shield size={12} /> {user.role}
-                    </span>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-sm">
-                    <StatusBadge isActive={user.isActive} isActivated={user.isActivated} />
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-600 dark:text-slate-300">
-                    <div className="flex items-center gap-1">
-                      <Cpu size={14} /> {user.devices?.length || 0}
-                    </div>
-                  </td>
-                  <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-500 dark:text-slate-400">{formatDate(user.createdAt)}</td>
-                  <td className="whitespace-nowrap px-4 py-3 text-right">
-                    <div className="flex justify-end gap-2">
-                      <button onClick={() => openEditModal(user)} className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700" title="Edit">
-                        <Edit size={16} />
-                      </button>
-                      <button onClick={() => openAssignModal(user)} className="rounded-lg p-1 text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700" title="Assign Devices">
-                        <Link size={16} />
-                      </button>
-                      <button onClick={() => openDeactivateModal(user)} className="rounded-lg p-1 text-red-500 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20" title="Deactivate">
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </motion.tr>
-              ))
+                  <option value="">Select an active organization</option>
+                  {organizations
+                    .filter((org) => org.isActive)
+                    .map((org) => (
+                      <option key={org.id} value={org.id}>
+                        {org.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+            </div>
+
+            <div>
+              <p className={`${sectionTitle} mb-2`}>
+                Assigned equipment (optional)
+              </p>
+              <EquipmentPicker
+                ids={invite.equipmentIds}
+                availableEquipment={availableEquipment}
+                filteredEquipment={filteredEquipment}
+                assignmentSearch={assignmentSearch}
+                setAssignmentSearch={setAssignmentSearch}
+                setIds={(equipmentIds) => setInvite({ ...invite, equipmentIds })}
+              />
+            </div>
+
+            {modalError && (
+              <p
+                role="alert"
+                className="rounded-lg border border-red-200 bg-red-50 p-2.5 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300"
+              >
+                {modalError}
+              </p>
             )}
-          </tbody>
-        </table>
+
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button variant="outline" type="button" onClick={closeModal} disabled={busy}>
+                Cancel
+              </Button>
+              <Button type="submit" loading={busy} leftIcon={UserPlus}>
+                Send Invitation
+              </Button>
+            </div>
+          </form>
+        </Modal>
+
+        {/* ============ VIEW MODAL ============ */}
+        <Modal
+          open={modal === "view"}
+          onClose={closeModal}
+          title="Controller Details"
+          size="xl"
+        >
+          {selected && (
+            <div className="space-y-5 text-sm">
+              {/* Header */}
+              <div className="flex items-start gap-4 rounded-xl border border-slate-200 bg-gradient-to-br from-[#064789]/5 to-[#427aa1]/5 p-4 dark:border-slate-700 dark:from-[#064789]/15 dark:to-[#427aa1]/10">
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#064789] to-[#427aa1] text-lg font-bold text-white">
+                  {initials(selected.name)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                    Controller
+                  </p>
+                  <p className="truncate text-lg font-bold text-slate-800 dark:text-slate-100">
+                    {selected.name}
+                  </p>
+                  <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                    {selected.email}
+                  </p>
+                </div>
+                <span
+                  className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ring-inset ${
+                    statusStyle(selected).pill
+                  }`}
+                >
+                  <span
+                    className={`h-1.5 w-1.5 rounded-full ${
+                      statusStyle(selected).dot
+                    }`}
+                  />
+                  {statusOf(selected)}
+                </span>
+              </div>
+
+              {/* Detail grid */}
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                <DetailRow
+                  label="Organization"
+                  value={selected.organization?.name}
+                  icon={Building2}
+                />
+                <DetailRow label="Role" value={selected.role} icon={ShieldCheck} />
+                <DetailRow label="Phone" value={selected.phone} icon={Phone} />
+                <DetailRow
+                  label="Assigned equipment"
+                  value={`${selected.equipment?.length ?? selected.equipmentIds?.length ?? 0} devices`}
+                  icon={Cpu}
+                />
+                <DetailRow
+                  label="Invited"
+                  value={
+                    selected.createdAt
+                      ? formatDate(selected.createdAt, "UTC")
+                      : "—"
+                  }
+                  icon={Clock}
+                />
+                <DetailRow
+                  label="Last active"
+                  value={
+                    selected.lastActiveAt
+                      ? formatDate(selected.lastActiveAt, "UTC")
+                      : "Never"
+                  }
+                  icon={Clock}
+                />
+              </div>
+
+              {/* Assigned equipment list */}
+              <div>
+                <p className={`${sectionTitle} mb-2`}>Assigned equipment</p>
+                {selected.equipment?.length ? (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {selected.equipment.map((device) => (
+                      <div
+                        key={device.id}
+                        className="flex items-center gap-3 rounded-xl border border-slate-200 p-3 dark:border-slate-700"
+                      >
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#064789]/10 text-[#064789] dark:bg-[#427aa1]/20 dark:text-[#8fc7e8]">
+                          <Cpu size={14} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-medium text-slate-800 dark:text-slate-100">
+                            {device.name}
+                          </p>
+                          <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                            {device.site?.name || device.type || "—"}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="rounded-xl border border-dashed border-slate-200 p-4 text-center text-sm text-slate-500 dark:border-slate-700 dark:text-slate-400">
+                    No equipment assigned yet.
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button variant="outline" onClick={closeModal}>
+                  Close
+                </Button>
+                <Button
+                  onClick={() => {
+                    closeModal();
+                    openEdit(selected);
+                  }}
+                  leftIcon={Pencil}
+                >
+                  Edit Controller
+                </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
+
+        {/* ============ EDIT MODAL ============ */}
+        <Modal
+          open={modal === "edit"}
+          onClose={closeModal}
+          title="Edit Controller"
+          size="lg"
+        >
+          <form onSubmit={submitEdit} className="space-y-4">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Input
+                label="Full name"
+                value={edit.name}
+                onChange={(e) => setEdit({ ...edit, name: e.target.value })}
+                required
+                icon={UserIcon}
+              />
+              <Input
+                label="Email"
+                type="email"
+                value={edit.email}
+                onChange={(e) => setEdit({ ...edit, email: e.target.value })}
+                required
+                icon={Mail}
+              />
+              <Input
+                label="Phone (optional)"
+                value={edit.phone}
+                onChange={(e) => setEdit({ ...edit, phone: e.target.value })}
+                icon={Phone}
+              />
+              <label className="text-sm">
+                <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  Role
+                </span>
+                <select
+                  className={selectClass}
+                  value={edit.role}
+                  onChange={(e) => setEdit({ ...edit, role: e.target.value })}
+                >
+                  <option value="CONTROLLER">Controller</option>
+                  <option value="ADMIN">Administrator</option>
+                  <option value="VIEWER">Viewer</option>
+                </select>
+              </label>
+              <div className="sm:col-span-2">
+                <label className="text-sm">
+                  <span className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                    Organization
+                  </span>
+                  <select
+                    className={selectClass}
+                    value={edit.organizationId}
+                    onChange={(e) =>
+                      setEdit({ ...edit, organizationId: e.target.value })
+                    }
+                  >
+                    <option value="">No organization</option>
+                    {organizations.map((org) => (
+                      <option key={org.id} value={org.id}>
+                        {org.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </div>
+
+            <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-300">
+              Changing the organization may affect equipment assignments. You
+              can re-assign equipment from the Assignments action afterward.
+            </p>
+
+            {modalError && (
+              <p
+                role="alert"
+                className="rounded-lg border border-red-200 bg-red-50 p-2.5 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300"
+              >
+                {modalError}
+              </p>
+            )}
+
+            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              <Button variant="outline" type="button" onClick={closeModal} disabled={busy}>
+                Cancel
+              </Button>
+              <Button type="submit" loading={busy}>
+                Save Changes
+              </Button>
+            </div>
+          </form>
+        </Modal>
+
+        {/* ============ ASSIGN MODAL ============ */}
+        <Modal
+          open={modal === "assign"}
+          onClose={closeModal}
+          title="Assign Equipment"
+          size="lg"
+        >
+          {selected && (
+            <div className="space-y-4 text-sm">
+              <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50/60 p-3 dark:border-slate-700 dark:bg-slate-800/40">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#064789] to-[#427aa1] text-xs font-bold text-white">
+                  {initials(selected.name)}
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate font-medium text-slate-800 dark:text-slate-100">
+                    {selected.name}
+                  </p>
+                  <p className="truncate text-xs text-slate-500 dark:text-slate-400">
+                    {selected.organization?.name || "No organization"}
+                  </p>
+                </div>
+              </div>
+
+              <EquipmentPicker ids={assignedIds} setIds={setAssignedIds} availableEquipment={availableEquipment} filteredEquipment={filteredEquipment} assignmentSearch={assignmentSearch} setAssignmentSearch={setAssignmentSearch} />
+
+              {modalError && (
+                <p
+                  role="alert"
+                  className="rounded-lg border border-red-200 bg-red-50 p-2.5 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300"
+                >
+                  {modalError}
+                </p>
+              )}
+
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button variant="outline" type="button" onClick={closeModal} disabled={busy}>
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={submitAssignments}
+                  loading={busy}
+                  leftIcon={UserCheck}
+                >
+                  Save Assignments
+                </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
+
+        {/* ============ DEACTIVATE MODAL ============ */}
+        <Modal
+          open={modal === "deactivate"}
+          onClose={closeModal}
+          title="Deactivate Controller"
+          size="sm"
+        >
+          {selected && (
+            <div className="space-y-4 text-sm">
+              <div className="flex gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-500 dark:bg-rose-500/10">
+                  <Ban size={18} />
+                </div>
+                <div>
+                  <p className="font-medium text-slate-800 dark:text-slate-100">
+                    Deactivate {selected.name}?
+                  </p>
+                  <p className="mt-1 text-slate-500 dark:text-slate-400">
+                    They will not be able to sign in. Assigned equipment
+                    remains linked and can be reassigned later.
+                  </p>
+                </div>
+              </div>
+
+              {modalError && (
+                <p
+                  role="alert"
+                  className="rounded-lg border border-red-200 bg-red-50 p-2.5 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300"
+                >
+                  {modalError}
+                </p>
+              )}
+
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button variant="outline" onClick={closeModal} disabled={busy}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="danger"
+                  onClick={confirmDeactivate}
+                  loading={busy}
+                  leftIcon={Ban}
+                >
+                  Deactivate
+                </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
+
+        {/* ============ REACTIVATE MODAL ============ */}
+        <Modal
+          open={modal === "reactivate"}
+          onClose={closeModal}
+          title="Reactivate Controller"
+          size="sm"
+        >
+          {selected && (
+            <div className="space-y-4 text-sm">
+              <div className="flex gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10">
+                  <RotateCcw size={18} />
+                </div>
+                <div>
+                  <p className="font-medium text-slate-800 dark:text-slate-100">
+                    Reactivate {selected.name}?
+                  </p>
+                  <p className="mt-1 text-slate-500 dark:text-slate-400">
+                    They will regain access to the workspace. If they were
+                    never activated, you may need to resend the invitation.
+                  </p>
+                </div>
+              </div>
+
+              {modalError && (
+                <p
+                  role="alert"
+                  className="rounded-lg border border-red-200 bg-red-50 p-2.5 text-sm text-red-700 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300"
+                >
+                  {modalError}
+                </p>
+              )}
+
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button variant="outline" onClick={closeModal} disabled={busy}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="success"
+                  onClick={confirmReactivate}
+                  loading={busy}
+                  leftIcon={RotateCcw}
+                >
+                  Reactivate
+                </Button>
+              </div>
+            </div>
+          )}
+        </Modal>
       </div>
-
-      {/* ── MODALS (unchanged) ───────────────────────────────────────────── */}
-
-      {/* CREATE MODAL */}
-      <Modal open={showCreateModal} onClose={() => setShowCreateModal(false)} title="Invite New User" size="md">
-        <form onSubmit={handleCreate} className="space-y-4">
-          <Input label="Full Name" value={createForm.name} onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })} required />
-          <Input label="Email" type="email" value={createForm.email} onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })} required />
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Role</label>
-            <select
-              value={createForm.role}
-              onChange={(e) => setCreateForm({ ...createForm, role: e.target.value })}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-            >
-              <option value="Controller">Controller</option>
-            </select>
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Assign Devices (at least one)</label>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setCreateDeviceMenuOpen((v) => !v)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-              >
-                {createForm.deviceIds.length > 0 ? `${createForm.deviceIds.length} device(s) selected` : 'Select devices'}
-              </button>
-              {createDeviceMenuOpen && (
-                <div className="absolute z-20 mt-2 max-h-56 w-full overflow-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-900">
-                  {devices.map((d) => {
-                    const checked = createForm.deviceIds.includes(d.id);
-                    return (
-                      <label key={d.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={(e) => {
-                            const next = e.target.checked
-                              ? [...createForm.deviceIds, d.id]
-                              : createForm.deviceIds.filter((id) => id !== d.id);
-                            setCreateForm({ ...createForm, deviceIds: next });
-                          }}
-                        />
-                        <span className="text-sm text-slate-700 dark:text-slate-200">{d.name} ({d.location})</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <div className="flex justify-end gap-2 pt-2">
-            <Button type="button" variant="secondary" onClick={() => setShowCreateModal(false)}>Cancel</Button>
-            <Button type="submit" loading={actionLoading}>Send Invitation</Button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* EDIT MODAL */}
-      <Modal open={showEditModal} onClose={() => setShowEditModal(false)} title="Edit User" size="md">
-        <div className="space-y-4">
-          <Input label="Name" value={editForm.name} onChange={(e) => setEditForm({ ...editForm, name: e.target.value })} />
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Role</label>
-            <select
-              value={editForm.role}
-              onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
-            >
-              <option value="Controller">Controller</option>
-            </select>
-          </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setShowEditModal(false)}>Cancel</Button>
-            <Button onClick={handleUpdate} loading={actionLoading}>Save Changes</Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* ASSIGN DEVICES MODAL */}
-      <Modal open={showAssignModal} onClose={() => setShowAssignModal(false)} title="Assign Devices" size="md">
-        <div className="space-y-4">
-          <p className="text-sm text-slate-600 dark:text-slate-300">
-            User: <span className="font-semibold">{selectedUser?.name}</span>
-          </p>
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700 dark:text-slate-300">Select Devices</label>
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setAssignDeviceMenuOpen((v) => !v)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-left text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
-              >
-                {assignForm.deviceIds.length > 0 ? `${assignForm.deviceIds.length} device(s) selected` : 'Select devices'}
-              </button>
-              {assignDeviceMenuOpen && (
-                <div className="absolute z-20 mt-2 max-h-56 w-full overflow-auto rounded-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-900">
-                  {devices.map((d) => {
-                    const checked = assignForm.deviceIds.includes(d.id);
-                    return (
-                      <label key={d.id} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-slate-50 dark:hover:bg-slate-800">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={(e) => {
-                            const next = e.target.checked
-                              ? [...assignForm.deviceIds, d.id]
-                              : assignForm.deviceIds.filter((id) => id !== d.id);
-                            setAssignForm({ deviceIds: next });
-                          }}
-                        />
-                        <span className="text-sm text-slate-700 dark:text-slate-200">{d.name} ({d.location})</span>
-                      </label>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setShowAssignModal(false)}>Cancel</Button>
-            <Button onClick={handleAssignDevices} loading={actionLoading}>Assign Devices</Button>
-          </div>
-        </div>
-      </Modal>
-
-      {/* DEACTIVATE CONFIRM MODAL */}
-      <Modal open={showDeactivateModal} onClose={() => setShowDeactivateModal(false)} title="Deactivate User" size="sm">
-        <div className="space-y-4">
-          <p className="text-slate-700 dark:text-slate-300">
-            Are you sure you want to deactivate <span className="font-semibold">{selectedUser?.name}</span>?
-            This will revoke all sessions and prevent login.
-          </p>
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={() => setShowDeactivateModal(false)}>Cancel</Button>
-            <Button onClick={handleDeactivate} loading={actionLoading} className="bg-red-600 hover:bg-red-700">Deactivate</Button>
-          </div>
-        </div>
-      </Modal>
     </PageContainer>
   );
 }

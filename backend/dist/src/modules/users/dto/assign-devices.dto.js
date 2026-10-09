@@ -13,12 +13,19 @@ exports.AssignDevicesDto = void 0;
 const class_validator_1 = require("class-validator");
 class AssignDevicesDto {
     deviceIds;
+    equipmentIds;
 }
 exports.AssignDevicesDto = AssignDevicesDto;
 __decorate([
+    (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsArray)(),
-    (0, class_validator_1.ArrayMinSize)(1),
     (0, class_validator_1.IsUUID)('4', { each: true }),
     __metadata("design:type", Array)
 ], AssignDevicesDto.prototype, "deviceIds", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsUUID)('4', { each: true }),
+    __metadata("design:type", Array)
+], AssignDevicesDto.prototype, "equipmentIds", void 0);
 //# sourceMappingURL=assign-devices.dto.js.map

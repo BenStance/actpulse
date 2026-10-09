@@ -18,30 +18,27 @@ import {
   CheckCircle2,
   Clock,
   Wifi,
-  Gauge,
-  TrendingUp
 } from 'lucide-react';
 import logoImage from '../../assets/images/logo.png';
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const { darkMode, toggleTheme, getBrandPrimary, getBrandSecondary, getBrandAccent } = useThemeContext();
+  const { darkMode, toggleTheme, getBrandPrimary, getBrandSecondary } = useThemeContext();
   const [isAnimating, setIsAnimating] = useState(false);
   const [mounted, setMounted] = useState(false);
 
   // Get brand colors from theme context with fallback
   const primaryColor = getBrandPrimary?.() || '#064789';
   const secondaryColor = getBrandSecondary?.() || '#427aa1';
-  const accentColor = getBrandAccent?.() || '#ebf2fa';
 
   const particlesInit = useCallback(async (engine) => {
     await loadSlim(engine);
   }, []);
 
   useEffect(() => {
-    setMounted(true);
+    const mountTimer = setTimeout(() => setMounted(true), 0);
     const timer = setTimeout(() => setIsAnimating(true), 500);
-    return () => clearTimeout(timer);
+    return () => { clearTimeout(mountTimer); clearTimeout(timer); };
   }, []);
 
   const handleSignIn = () => {

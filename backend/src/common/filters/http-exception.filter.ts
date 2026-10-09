@@ -29,7 +29,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const message =
       typeof errorResponse === 'string'
         ? errorResponse
-        : (errorResponse as { message?: string | string[] }).message ?? 'Unknown error';
+        : ((errorResponse as { message?: string | string[] }).message ??
+          'Unknown error');
 
     const stack = exception instanceof Error ? exception.stack : undefined;
     this.logger.error(

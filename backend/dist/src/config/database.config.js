@@ -7,7 +7,7 @@ exports.default = () => ({
         username: process.env.DB_USERNAME ?? 'postgres',
         password: process.env.DB_PASSWORD ?? '',
         name: process.env.DB_NAME ?? 'actpulse',
-        synchronize: (process.env.DB_SYNCHRONIZE ?? 'true') === 'true',
+        synchronize: (process.env.DB_SYNCHRONIZE ?? 'false') === 'true',
         logging: (process.env.DB_LOGGING ?? 'false') === 'true',
     },
 });

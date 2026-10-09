@@ -15,24 +15,38 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.DeviceApiKeyGuard = void 0;
 const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
+const crypto_1 = require("crypto");
 const typeorm_2 = require("typeorm");
 const device_entity_1 = require("../../modules/devices/device.entity");
 let DeviceApiKeyGuard = class DeviceApiKeyGuard {
-    devicesRepository;
-    constructor(devicesRepository) {
-        this.devicesRepository = devicesRepository;
+    devices;
+    constructor(devices) {
+        this.devices = devices;
     }
     async canActivate(context) {
-        const request = context.switchToHttp().getRequest();
-        const authorization = request.headers.authorization ?? '';
-        if (!authorization.startsWith('ApiKey ')) {
-            throw new common_1.UnauthorizedException('Invalid device authorization scheme');
-        }
-        const apiKey = authorization.replace('ApiKey ', '').trim();
-        const device = await this.devicesRepository.findOne({ where: { apiKey, isActive: true }, relations: ['users'] });
-        if (!device) {
-            throw new common_1.UnauthorizedException('Invalid API key or inactive device');
-        }
+        const request = context
+            .switchToHttp()
+            .getRequest();
+        const header = request.headers.authorization ?? '';
+        if (!header.startsWith('ApiKey '))
+            throw new common_1.UnauthorizedException('Invalid device authorization');
+        const apiKey = header.slice(7).trim();
+        if (apiKey.length < 16 || apiKey.length > 256)
+            throw new common_1.UnauthorizedException('Invalid device authorization');
+        const hash = (0, crypto_1.createHash)('sha256').update(apiKey).digest('hex');
+        const match = /^ap_([0-9a-f]{16})\.[A-Za-z0-9_-]{40,50}$/.exec(apiKey);
+        const device = await this.devices.findOne({
+            where: match ? { credentialId: match[1] } : { credentialHash: hash },
+            relations: ['organization', 'equipment'],
+        });
+        if (!device?.credentialHash ||
+            !(0, crypto_1.timingSafeEqual)(Buffer.from(hash, 'hex'), Buffer.from(device.credentialHash, 'hex')) ||
+            device.lifecycleState !== device_entity_1.DeviceLifecycle.ACTIVE ||
+            !device.isActive ||
+            !device.organization?.isActive ||
+            !device.equipment?.isActive ||
+            device.currentEquipmentId !== device.equipment.id)
+            throw new common_1.UnauthorizedException('Invalid API key or inactive monitor');
         request.device = device;
         return true;
     }

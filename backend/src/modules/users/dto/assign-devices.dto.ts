@@ -1,8 +1,13 @@
-import { ArrayMinSize, IsArray, IsUUID } from 'class-validator';
+import { IsArray, IsOptional, IsUUID } from 'class-validator';
 
 export class AssignDevicesDto {
+  @IsOptional()
   @IsArray()
-  @ArrayMinSize(1)
   @IsUUID('4', { each: true })
-  deviceIds!: string[];
+  deviceIds?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsUUID('4', { each: true })
+  equipmentIds?: string[];
 }

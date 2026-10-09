@@ -1,5 +1,6 @@
 // src/context/ThemeContext.js
-import React, { createContext, useContext, useMemo, useState, useEffect, useCallback } from 'react';
+/* eslint-disable react-refresh/only-export-components -- Theme helpers and provider share this context module. */
+import { createContext, useContext, useMemo, useState, useEffect, useCallback } from 'react';
 
 // ACTpulse Brand Colors (as specified)
 const BRAND_COLORS = {
@@ -227,7 +228,8 @@ export function ThemeProvider({ children }) {
     localStorage.setItem(THEME_STORAGE_KEY, theme);
     localStorage.setItem(LEGACY_THEME_STORAGE_KEY, theme);
     
-    setMounted(true);
+    const mountTimer = setTimeout(() => setMounted(true), 0);
+    return () => clearTimeout(mountTimer);
   }, [darkMode]);
 
   // Toggle theme with smooth transition

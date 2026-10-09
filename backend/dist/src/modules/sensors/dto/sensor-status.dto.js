@@ -14,6 +14,8 @@ const class_validator_1 = require("class-validator");
 const sensor_status_enum_1 = require("../../../common/enums/sensor-status.enum");
 class SensorStatusDto {
     status;
+    eventId;
+    observedAt;
     timestamp;
 }
 exports.SensorStatusDto = SensorStatusDto;
@@ -23,7 +25,19 @@ __decorate([
 ], SensorStatusDto.prototype, "status", void 0);
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.MaxLength)(120),
+    __metadata("design:type", String)
+], SensorStatusDto.prototype, "eventId", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsISO8601)({ strict: true }),
+    __metadata("design:type", String)
+], SensorStatusDto.prototype, "observedAt", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
     __metadata("design:type", Number)
 ], SensorStatusDto.prototype, "timestamp", void 0);
 //# sourceMappingURL=sensor-status.dto.js.map

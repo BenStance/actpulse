@@ -23,6 +23,12 @@ const realtime_module_1 = require("./modules/realtime/realtime.module");
 const reports_module_1 = require("./modules/reports/reports.module");
 const sensors_module_1 = require("./modules/sensors/sensors.module");
 const users_module_1 = require("./modules/users/users.module");
+const organizations_module_1 = require("./modules/organizations/organizations.module");
+const sites_module_1 = require("./modules/sites/sites.module");
+const equipment_module_1 = require("./modules/equipment/equipment.module");
+const monitoring_module_1 = require("./modules/monitoring/monitoring.module");
+const operations_module_1 = require("./modules/operations/operations.module");
+const billing_module_1 = require("./modules/billing/billing.module");
 let AppModule = class AppModule {
 };
 exports.AppModule = AppModule;
@@ -49,7 +55,13 @@ exports.AppModule = AppModule = __decorate([
             }),
             mail_module_1.MailModule,
             auth_module_1.AuthModule,
+            billing_module_1.BillingModule,
             users_module_1.UsersModule,
+            organizations_module_1.OrganizationsModule,
+            monitoring_module_1.MonitoringModule,
+            operations_module_1.OperationsModule,
+            sites_module_1.SitesModule,
+            equipment_module_1.EquipmentModule,
             devices_module_1.DevicesModule,
             sensors_module_1.SensorsModule,
             realtime_module_1.RealtimeModule,

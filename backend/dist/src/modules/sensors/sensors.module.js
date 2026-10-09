@@ -11,6 +11,7 @@ const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const device_api_key_guard_1 = require("../../common/guards/device-api-key.guard");
 const device_entity_1 = require("../devices/device.entity");
+const monitoring_module_1 = require("../monitoring/monitoring.module");
 const realtime_module_1 = require("../realtime/realtime.module");
 const sensor_log_entity_1 = require("./sensor-log.entity");
 const sensors_controller_1 = require("./sensors.controller");
@@ -20,7 +21,11 @@ let SensorsModule = class SensorsModule {
 exports.SensorsModule = SensorsModule;
 exports.SensorsModule = SensorsModule = __decorate([
     (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([sensor_log_entity_1.SensorLog, device_entity_1.Device]), realtime_module_1.RealtimeModule],
+        imports: [
+            typeorm_1.TypeOrmModule.forFeature([sensor_log_entity_1.SensorLog, device_entity_1.Device]),
+            monitoring_module_1.MonitoringModule,
+            realtime_module_1.RealtimeModule,
+        ],
         controllers: [sensors_controller_1.SensorsController],
         providers: [sensors_service_1.SensorsService, device_api_key_guard_1.DeviceApiKeyGuard],
         exports: [sensors_service_1.SensorsService, typeorm_1.TypeOrmModule],

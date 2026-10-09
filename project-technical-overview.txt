@@ -1,0 +1,50 @@
+ACTPULSE TECHNICAL OVERVIEW — PHASE 02, MODULES 1–8
+Updated 2026-10-01. This replaces the earlier Phase 01 overview.
+
+1. Project folders
+- backend/src: app bootstrap; common decorators, enums, filters, guards, interceptors and security helpers; config; database migrations; modules for auth, users, organizations, devices, sensors, dashboard, reports, realtime and mail; explicit Admin bootstrap script.
+- frontend/src: API client; app router/route guard; common and layout components; theme context; Admin, Controller, public and shared account pages; Zustand stores; utility helpers.
+
+2. Dependencies
+- backend/package.json: NestJS 11, TypeORM, PostgreSQL driver, JWT, bcryptjs, class-validator, Socket.IO, Nodemailer, Jest, TypeScript and ESLint.
+- frontend/package.json: React 19, Vite, React Router, Axios, Zustand, Tailwind CSS, charts, animation, Socket.IO client and ESLint.
+
+3. Project rules
+- No AGENTS.md or IDE instruction files were found in the workspace when this overview was updated. The Phase 02 writeup provided the implementation rules: exactly Admin and Controller roles, preserve existing records/history, use migrations, secure secrets, and enforce access on the backend.
+
+4. Backend and database configuration
+- backend/src/main.ts loads environment variables, validates JWT, database, SMTP and rate-limit settings, installs global validation, logging and exception handling, enables CORS, and starts NestJS.
+- backend/src/app.module.ts registers configuration, TypeORM and feature modules.
+- backend/src/config/database.config.ts uses PostgreSQL; synchronize is false by default. backend/ormconfig.ts configures TypeORM CLI migrations.
+- Phase 02 migrations add organizations and backfill existing Controllers/devices into Legacy Customer, add OTP attempt tracking and hash legacy OTP/token values, and hash existing blacklisted JWTs. Existing assignment and sensor data remain attached to their devices.
+- The live local database has all six migrations applied. The sixth migration adds sites, equipment, equipment assignments, monitor binding/key audit and connectivity events, and observation provenance. The current schema is recorded in database-schema.txt.
+
+5. Authentication backend
+- auth.controller.ts and auth.service.ts implement login/logout, forgot/reset password, GET/PATCH /auth/me and change-password. UsersController handles Controller invitation activation.
+- AuthSessionService is shared by the HTTP JWT guard and Socket.IO gateway. It verifies the Bearer token plus current account, organization, token version and blacklist state. The old standalone Passport JWT strategy was removed.
+- AuthRateLimiterService covers login, code requests and verification. OTPs/invitation tokens are HMAC hashes; blacklisted JWTs are digests. Passwords use bcrypt and 8–72 UTF-8-byte validation.
+- UserRole contains only Admin and Controller. user.entity.ts holds the account, status, token version, organization link and device assignments. Admin accounts have no organization; Controllers require one.
+
+6. User and organization backend
+- UsersController restricts list/detail/invite/edit/assignment/resend/deactivate/reactivate to Admin. UsersService validates organization/equipment ownership and normalizes email. DTOs reject extra fields. user-response.ts produces safe explicit account summaries.
+- OrganizationsController exposes Admin management and Controller GET /organizations/me. OrganizationsService handles counts, details, active state and socket invalidation. Database foreign keys prevent deleting organizations that own operational records.
+- DevicesService returns safe summaries, scopes Controller reads by organization plus equipment assignment, and keeps API key disclosure in dedicated Admin provisioning responses. Sites, Equipment and Monitoring modules manage profile data, binding history, persistent connectivity and observed duration metrics.
+
+7. Authentication frontend
+- Login has no prefilled credentials. ActivateAccount requires email, OTP, invitation token and password. ForgotPassword and ResetPassword preserve the reset flow.
+- ProtectedRoute and auth.store.js validate stored sessions through GET /auth/me, handle 401 by clearing auth/device caches and sockets, and show a retry state for verification failures such as 403 or network errors.
+- Shared Profile and AccountSecurity screens display account information, edit only the name, and change the password with confirmation before returning to Login. actPulse.Api.js supplies Axios calls with the Bearer token.
+
+8. Shared frontend structure
+- app/router.jsx defines public routes plus Admin and Controller areas. App.jsx connects the authorized socket session. SideBar and TopBar expose role-appropriate navigation and shared account links.
+- Admin pages include Organizations, Sites, Equipment, Users, Devices, dashboard and reports. Controller has read-only Sites, Equipment, AssignedDevices and DeviceDetails plus dashboard and reports. Reusable Input/Button components and ThemeContext support forms and light/dark themes.
+
+9. Environment template
+- backend/.env.example contains placeholders for PORT, JWT_SECRET, DB_HOST, DB_PORT, DB_USERNAME, DB_PASSWORD, DB_NAME, DB_SYNCHRONIZE, DB_LOGGING, EMAIL_HOST, EMAIL_PORT, EMAIL_USER, EMAIL_PASSWORD, BOOTSTRAP_ADMIN_NAME, BOOTSTRAP_ADMIN_EMAIL, BOOTSTRAP_ADMIN_PASSWORD, AUTH_LOGIN_LIMIT, AUTH_OTP_REQUEST_LIMIT, AUTH_VERIFY_LIMIT, AUTH_RATE_WINDOW_SECONDS and AUTH_OTP_MAX_ATTEMPTS.
+- frontend can set VITE_API_BASE_URL; otherwise it uses http://localhost:3000. Keep real values only in untracked environment files.
+
+10. Checks and known limits
+- Backend TypeScript no-emit check and frontend production build pass. A new PostgreSQL integration flow for site/equipment/monitor provisioning, ingestion, report access and key rotation passes. The older nine-test suite targets the former device contract and currently fails until its fixtures and assertions are updated. Modules 4–8 changed frontend files pass ESLint; full repository lint retains earlier unrelated findings.
+- Headless Chromium exercised the actual React activation, login, profile and password-change forms using mocked API responses. Backend API flows were verified independently. Real SMTP delivery remains unverified.
+- Auth request limits are process-local. Socket invalidation uses this backend process; multi-instance operation would require shared coordination.
+- Previously tracked backend/.env values remain in Git history. Rotate the former PostgreSQL/SMTP credentials and previously hard-coded Admin password; replace the old JWT signing secret in any other deployment that used it.

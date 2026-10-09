@@ -18,63 +18,78 @@ const roles_decorator_1 = require("../../common/decorators/roles.decorator");
 const user_role_enum_1 = require("../../common/enums/user-role.enum");
 const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
 const roles_guard_1 = require("../../common/guards/roles.guard");
+const device_entity_1 = require("./device.entity");
 const create_device_dto_1 = require("./dto/create-device.dto");
+const replace_device_dto_1 = require("./dto/replace-device.dto");
 const update_device_dto_1 = require("./dto/update-device.dto");
 const devices_service_1 = require("./devices.service");
 let DevicesController = class DevicesController {
-    devicesService;
-    constructor(devicesService) {
-        this.devicesService = devicesService;
+    devices;
+    constructor(devices) {
+        this.devices = devices;
     }
-    create(dto) {
-        return this.devicesService.create(dto);
+    create(dto, req) {
+        return this.devices.create(dto, req.user.sub);
     }
-    findAll(req) {
-        return this.devicesService.findAll(req.user.sub);
+    list(req) {
+        return this.devices.findAll(req.user.sub);
     }
-    findOne(id, req) {
-        return this.devicesService.findOne(id, req.user.sub);
+    detail(id, req) {
+        return this.devices.findOne(id, req.user.sub);
     }
     update(id, dto, req) {
-        return this.devicesService.update(id, dto, req.user.sub);
+        return this.devices.update(id, dto, req.user.sub);
     }
-    deactivate(id, req) {
-        return this.devicesService.deactivate(id, req.user.sub);
+    rotate(id, req) {
+        return this.devices.rotateKey(id, req.user.sub);
     }
-    rotateKey(id, req) {
-        return this.devicesService.rotateKey(id, req.user.sub);
+    replace(id, dto, req) {
+        return this.devices.replace(id, dto, req.user.sub);
+    }
+    activate(id, req) {
+        return this.devices.setLifecycle(id, device_entity_1.DeviceLifecycle.ACTIVE, req.user.sub);
+    }
+    disable(id, req) {
+        return this.devices.setLifecycle(id, device_entity_1.DeviceLifecycle.DISABLED, req.user.sub);
+    }
+    retire(id, req) {
+        return this.devices.setLifecycle(id, device_entity_1.DeviceLifecycle.RETIRED, req.user.sub);
+    }
+    legacyDisable(id, req) {
+        return this.devices.setLifecycle(id, device_entity_1.DeviceLifecycle.DISABLED, req.user.sub);
     }
 };
 exports.DevicesController = DevicesController;
 __decorate([
     (0, common_1.Post)(),
-    (0, roles_decorator_1.Roles)(user_role_enum_1.UserRole.ADMIN, user_role_enum_1.UserRole.CONTROLLER),
+    (0, roles_decorator_1.Roles)(user_role_enum_1.UserRole.ADMIN),
     __param(0, (0, common_1.Body)()),
+    __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [create_device_dto_1.CreateDeviceDto]),
+    __metadata("design:paramtypes", [create_device_dto_1.CreateDeviceDto, Object]),
     __metadata("design:returntype", void 0)
 ], DevicesController.prototype, "create", null);
 __decorate([
     (0, common_1.Get)(),
-    (0, roles_decorator_1.Roles)(user_role_enum_1.UserRole.ADMIN, user_role_enum_1.UserRole.CONTROLLER, user_role_enum_1.UserRole.USER),
+    (0, roles_decorator_1.Roles)(user_role_enum_1.UserRole.ADMIN, user_role_enum_1.UserRole.CONTROLLER),
     __param(0, (0, common_1.Req)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [Object]),
     __metadata("design:returntype", void 0)
-], DevicesController.prototype, "findAll", null);
+], DevicesController.prototype, "list", null);
 __decorate([
     (0, common_1.Get)(':id'),
-    (0, roles_decorator_1.Roles)(user_role_enum_1.UserRole.ADMIN, user_role_enum_1.UserRole.CONTROLLER, user_role_enum_1.UserRole.USER),
-    __param(0, (0, common_1.Param)('id')),
+    (0, roles_decorator_1.Roles)(user_role_enum_1.UserRole.ADMIN, user_role_enum_1.UserRole.CONTROLLER),
+    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
     __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
-], DevicesController.prototype, "findOne", null);
+], DevicesController.prototype, "detail", null);
 __decorate([
     (0, common_1.Patch)(':id'),
-    (0, roles_decorator_1.Roles)(user_role_enum_1.UserRole.ADMIN, user_role_enum_1.UserRole.CONTROLLER),
-    __param(0, (0, common_1.Param)('id')),
+    (0, roles_decorator_1.Roles)(user_role_enum_1.UserRole.ADMIN),
+    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
     __param(1, (0, common_1.Body)()),
     __param(2, (0, common_1.Req)()),
     __metadata("design:type", Function),
@@ -82,23 +97,60 @@ __decorate([
     __metadata("design:returntype", void 0)
 ], DevicesController.prototype, "update", null);
 __decorate([
-    (0, common_1.Delete)(':id'),
-    (0, roles_decorator_1.Roles)(user_role_enum_1.UserRole.ADMIN, user_role_enum_1.UserRole.CONTROLLER),
-    __param(0, (0, common_1.Param)('id')),
-    __param(1, (0, common_1.Req)()),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [String, Object]),
-    __metadata("design:returntype", void 0)
-], DevicesController.prototype, "deactivate", null);
-__decorate([
     (0, common_1.Post)(':id/rotate-key'),
-    (0, roles_decorator_1.Roles)(user_role_enum_1.UserRole.ADMIN, user_role_enum_1.UserRole.CONTROLLER),
-    __param(0, (0, common_1.Param)('id')),
+    (0, roles_decorator_1.Roles)(user_role_enum_1.UserRole.ADMIN),
+    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
     __param(1, (0, common_1.Req)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
-], DevicesController.prototype, "rotateKey", null);
+], DevicesController.prototype, "rotate", null);
+__decorate([
+    (0, common_1.Post)(':id/replace'),
+    (0, roles_decorator_1.Roles)(user_role_enum_1.UserRole.ADMIN),
+    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __param(1, (0, common_1.Body)()),
+    __param(2, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, replace_device_dto_1.ReplaceDeviceDto, Object]),
+    __metadata("design:returntype", void 0)
+], DevicesController.prototype, "replace", null);
+__decorate([
+    (0, common_1.Post)(':id/activate'),
+    (0, roles_decorator_1.Roles)(user_role_enum_1.UserRole.ADMIN),
+    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __param(1, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], DevicesController.prototype, "activate", null);
+__decorate([
+    (0, common_1.Post)(':id/disable'),
+    (0, roles_decorator_1.Roles)(user_role_enum_1.UserRole.ADMIN),
+    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __param(1, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], DevicesController.prototype, "disable", null);
+__decorate([
+    (0, common_1.Post)(':id/retire'),
+    (0, roles_decorator_1.Roles)(user_role_enum_1.UserRole.ADMIN),
+    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __param(1, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], DevicesController.prototype, "retire", null);
+__decorate([
+    (0, common_1.Delete)(':id'),
+    (0, roles_decorator_1.Roles)(user_role_enum_1.UserRole.ADMIN),
+    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __param(1, (0, common_1.Req)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", void 0)
+], DevicesController.prototype, "legacyDisable", null);
 exports.DevicesController = DevicesController = __decorate([
     (0, common_1.Controller)('devices'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),

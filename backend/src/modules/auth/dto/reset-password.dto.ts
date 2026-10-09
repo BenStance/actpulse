@@ -1,4 +1,4 @@
-import { IsEmail, IsOptional, IsString, Length, MinLength } from 'class-validator';
+import { IsEmail, IsString, Length, MinLength } from 'class-validator';
 
 export class ResetPasswordDto {
   @IsEmail()
@@ -8,11 +8,7 @@ export class ResetPasswordDto {
   @Length(6, 6)
   otp!: string;
 
-  @IsOptional()
   @IsString()
-  token?: string;
-
-  @IsString()
-  @MinLength(6)
+  @MinLength(8)
   newPassword!: string;
 }

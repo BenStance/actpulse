@@ -16,236 +16,247 @@ exports.ReportsService = void 0;
 const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
-const user_role_enum_1 = require("../../common/enums/user-role.enum");
 const device_entity_1 = require("../devices/device.entity");
-const sensor_log_entity_1 = require("../sensors/sensor-log.entity");
-const user_entity_1 = require("../users/user.entity");
+const device_binding_entity_1 = require("../devices/device-binding.entity");
+const monitoring_service_1 = require("../monitoring/monitoring.service");
 let ReportsService = class ReportsService {
-    usersRepository;
-    devicesRepository;
-    sensorLogsRepository;
-    constructor(usersRepository, devicesRepository, sensorLogsRepository) {
-        this.usersRepository = usersRepository;
-        this.devicesRepository = devicesRepository;
-        this.sensorLogsRepository = sensorLogsRepository;
+    devices;
+    bindings;
+    access;
+    monitoring;
+    constructor(devices, bindings, access, monitoring) {
+        this.devices = devices;
+        this.bindings = bindings;
+        this.access = access;
+        this.monitoring = monitoring;
     }
-    async getDeviceUptime(userId, deviceId, from, to) {
-        const { fromDate, toDate } = this.parseRange(from, to);
-        const device = await this.ensureDeviceAccess(userId, deviceId);
-        const segments = await this.buildSegments(device.id, fromDate, toDate);
-        const summary = this.summarizeSegments(segments, fromDate, toDate);
-        return {
-            device: { id: device.id, name: device.name },
-            period: { from: fromDate.toISOString(), to: toDate.toISOString() },
-            summary,
-            table: segments,
-        };
-    }
-    async getDeviceDaily(userId, deviceId, from, to) {
-        const { fromDate, toDate } = this.parseRange(from, to);
-        await this.ensureDeviceAccess(userId, deviceId);
-        const segments = await this.buildSegments(deviceId, fromDate, toDate);
-        return this.toDailyBreakdown(segments, fromDate, toDate);
-    }
-    async getDeviceEvents(userId, deviceId, from, to) {
-        const { fromDate, toDate } = this.parseRange(from, to);
-        await this.ensureDeviceAccess(userId, deviceId);
-        const logs = await this.sensorLogsRepository.find({
-            where: { deviceId, recordedAt: (0, typeorm_2.Between)(fromDate, toDate) },
-            order: { recordedAt: 'ASC' },
-        });
-        const events = [];
-        let prev = null;
-        for (const log of logs) {
-            if (prev === null) {
-                prev = log.status;
-                events.push({
-                    timestamp: log.recordedAt.toISOString(),
-                    status: log.status,
-                    transition: null,
-                });
-                continue;
-            }
-            const transition = prev === log.status ? null : `${prev}->${log.status}`;
-            events.push({
-                timestamp: log.recordedAt.toISOString(),
-                status: log.status,
-                transition,
+    async target(userId, filters) {
+        let id = filters.equipmentId;
+        if (!id && filters.deviceId) {
+            const device = await this.devices.findOne({
+                where: { id: filters.deviceId },
             });
-            prev = log.status;
+            id =
+                device?.currentEquipmentId ??
+                    (await this.bindings.findOne({
+                        where: { deviceId: filters.deviceId },
+                        order: { startedAt: 'DESC' },
+                    }))?.equipmentId;
         }
-        return {
-            deviceId,
-            period: { from: fromDate.toISOString(), to: toDate.toISOString() },
-            count: events.length,
-            events,
-        };
+        if (!id)
+            throw new common_1.BadRequestException('Select equipment');
+        return this.access.one(userId, id);
     }
-    async getFleetSummary(userId, from, to) {
-        const { fromDate, toDate } = this.parseRange(from, to);
-        const deviceIds = await this.resolveAccessibleDeviceIds(userId);
-        if (deviceIds.length === 0) {
-            return {
-                period: { from: fromDate.toISOString(), to: toDate.toISOString() },
-                totals: { devices: 0, uptimeSeconds: 0, downtimeSeconds: 0, uptimePercentage: 0 },
-                devices: [],
-            };
-        }
-        const devices = await this.devicesRepository.findBy({ id: (0, typeorm_2.In)(deviceIds) });
-        const rows = [];
-        let totalUp = 0;
-        let totalDown = 0;
-        for (const device of devices) {
-            const segments = await this.buildSegments(device.id, fromDate, toDate);
-            const summary = this.summarizeSegments(segments, fromDate, toDate);
-            totalUp += summary.uptimeSeconds;
-            totalDown += summary.downtimeSeconds;
-            rows.push({
-                device: { id: device.id, name: device.name },
-                ...summary,
-            });
-        }
-        const denom = totalUp + totalDown;
+    async equipmentReport(userId, filters) {
+        const row = await this.target(userId, filters);
+        const period = this.monitoring.resolvePeriod(filters, row.site.timezone);
+        const [metrics, snapshot] = await Promise.all([
+            this.monitoring.metrics(row, period.from, period.to, period.timezone),
+            this.monitoring.snapshot(row),
+        ]);
         return {
-            period: { from: fromDate.toISOString(), to: toDate.toISOString() },
-            totals: {
-                devices: rows.length,
-                uptimeSeconds: totalUp,
-                downtimeSeconds: totalDown,
-                uptimePercentage: denom > 0 ? Number(((totalUp / denom) * 100).toFixed(2)) : 0,
+            equipment: {
+                id: row.id,
+                name: row.name,
+                type: row.type,
+                site: {
+                    id: row.site.id,
+                    name: row.site.name,
+                    timezone: row.site.timezone,
+                },
+                monitoringDefinition: row.monitoringDefinition,
             },
-            devices: rows,
+            period: metrics.period,
+            timezone: metrics.timezone,
+            summary: {
+                onMs: metrics.onMs,
+                offMs: metrics.offMs,
+                unknownMs: metrics.unknownMs,
+                knownMs: metrics.knownMs,
+                eligibleMs: metrics.eligibleMs,
+                excludedMs: metrics.excludedMs,
+                dataCoverage: metrics.dataCoverage,
+                onShareOfKnown: metrics.onShareOfKnown,
+                observedOnSessionCount: metrics.observedOnSessionCount,
+                completedOnSessionCount: metrics.completedOnSessionCount,
+                averageCompletedOnSessionMs: metrics.averageCompletedOnSessionMs,
+                longestCompletedOnSessionMs: metrics.longestCompletedOnSessionMs,
+                currentObservedOnSessionMs: metrics.currentObservedOnSessionMs,
+                firstObservation: metrics.firstObservation,
+                lastObservation: metrics.lastObservation,
+            },
+            daily: metrics.daily,
+            segments: metrics.segments,
+            sessions: metrics.sessions,
+            snapshot,
         };
     }
-    parseRange(from, to) {
-        const fromDate = new Date(from);
-        const toDate = new Date(to);
-        if (Number.isNaN(fromDate.getTime()) || Number.isNaN(toDate.getTime())) {
-            throw new common_1.BadRequestException('Invalid from/to date range');
-        }
-        if (toDate <= fromDate) {
-            throw new common_1.BadRequestException('"to" must be greater than "from"');
-        }
-        return { fromDate, toDate };
-    }
-    async ensureDeviceAccess(userId, deviceId) {
-        const device = await this.devicesRepository.findOne({ where: { id: deviceId } });
-        if (!device)
-            throw new common_1.NotFoundException('Device not found');
-        const allowed = await this.resolveAccessibleDeviceIds(userId);
-        if (!allowed.includes(deviceId)) {
-            throw new common_1.ForbiddenException('You do not have access to this device');
-        }
-        return device;
-    }
-    async resolveAccessibleDeviceIds(userId) {
-        const user = await this.usersRepository.findOne({ where: { id: userId }, relations: ['devices'] });
-        if (!user)
-            return [];
-        if (user.role === user_role_enum_1.UserRole.ADMIN) {
-            const all = await this.devicesRepository.find({ select: { id: true } });
-            return all.map((d) => d.id);
-        }
-        return (user.devices ?? []).map((d) => d.id);
-    }
-    async buildSegments(deviceId, fromDate, toDate) {
-        const prevLog = await this.sensorLogsRepository.findOne({
-            where: { deviceId, recordedAt: (0, typeorm_2.LessThan)(fromDate) },
-            order: { recordedAt: 'DESC' },
-        });
-        const logs = await this.sensorLogsRepository.find({
-            where: { deviceId, recordedAt: (0, typeorm_2.Between)(fromDate, toDate) },
-            order: { recordedAt: 'ASC' },
-        });
-        let currentStatus = prevLog?.status ?? 'OFF';
-        let cursor = fromDate;
-        const segments = [];
-        for (const log of logs) {
-            if (log.recordedAt <= cursor) {
-                currentStatus = log.status;
-                continue;
-            }
-            segments.push(this.makeSegment(cursor, log.recordedAt, currentStatus));
-            currentStatus = log.status;
-            cursor = log.recordedAt;
-        }
-        if (cursor < toDate) {
-            segments.push(this.makeSegment(cursor, toDate, currentStatus));
-        }
-        return segments;
-    }
-    makeSegment(start, end, status) {
-        const seconds = Math.max(0, Math.floor((end.getTime() - start.getTime()) / 1000));
+    async events(userId, filters) {
+        const row = await this.target(userId, filters);
+        const period = this.monitoring.resolvePeriod(filters, row.site.timezone);
         return {
-            start: start.toISOString(),
-            end: end.toISOString(),
-            durationMinutes: Math.floor(seconds / 60),
-            type: status === 'ON' ? 'UPTIME' : 'DOWNTIME',
+            ...(await this.monitoring.events(row.id, period.from, period.to, Number(filters.page || 1), Number(filters.pageSize || 25))),
+            equipment: { id: row.id, name: row.name },
+            period: { from: period.from, to: period.to, timezone: period.timezone },
         };
     }
-    summarizeSegments(segments, fromDate, toDate) {
-        const uptimeSeconds = segments
-            .filter((s) => s.type === 'UPTIME')
-            .reduce((sum, s) => sum + s.durationMinutes * 60, 0);
-        const downtimeSeconds = segments
-            .filter((s) => s.type === 'DOWNTIME')
-            .reduce((sum, s) => sum + s.durationMinutes * 60, 0);
-        const rangeSeconds = Math.floor((toDate.getTime() - fromDate.getTime()) / 1000);
-        const uptimePercentage = rangeSeconds > 0 ? Number(((uptimeSeconds / rangeSeconds) * 100).toFixed(2)) : 0;
-        return {
-            uptimeSeconds,
-            downtimeSeconds,
-            uptimePercentage,
-        };
-    }
-    toDailyBreakdown(segments, fromDate, toDate) {
-        const days = {};
-        const cursor = new Date(fromDate);
-        cursor.setUTCHours(0, 0, 0, 0);
-        const endDay = new Date(toDate);
-        endDay.setUTCHours(0, 0, 0, 0);
-        while (cursor <= endDay) {
-            const key = cursor.toISOString().slice(0, 10);
-            days[key] = { uptimeSeconds: 0, downtimeSeconds: 0 };
-            cursor.setUTCDate(cursor.getUTCDate() + 1);
-        }
-        for (const seg of segments) {
-            let start = new Date(seg.start);
-            const end = new Date(seg.end);
-            while (start < end) {
-                const dayKey = start.toISOString().slice(0, 10);
-                const nextDay = new Date(start);
-                nextDay.setUTCHours(24, 0, 0, 0);
-                const sliceEnd = end < nextDay ? end : nextDay;
-                const sliceSeconds = Math.floor((sliceEnd.getTime() - start.getTime()) / 1000);
-                if (days[dayKey]) {
-                    if (seg.type === 'UPTIME')
-                        days[dayKey].uptimeSeconds += sliceSeconds;
-                    else
-                        days[dayKey].downtimeSeconds += sliceSeconds;
-                }
-                start = sliceEnd;
-            }
-        }
-        return Object.entries(days).map(([day, values]) => {
-            const total = values.uptimeSeconds + values.downtimeSeconds;
+    async fleet(userId, filters) {
+        const rows = await this.monitoring.scopedEquipment(userId, {
+            organizationId: filters.organizationId,
+            siteId: filters.siteId,
+            type: filters.type,
+        });
+        const zones = [...new Set(rows.map((row) => row.site.timezone))];
+        if (zones.length > 1 && !filters.timezone)
+            throw new common_1.BadRequestException('Select a reporting timezone for multiple sites');
+        const period = this.monitoring.resolvePeriod(filters, filters.timezone || zones[0] || 'Africa/Dar_es_Salaam');
+        const equipment = await Promise.all(rows.map(async (row) => {
+            const [metrics, snapshot] = await Promise.all([
+                this.monitoring.metrics(row, period.from, period.to, period.timezone),
+                this.monitoring.snapshot(row),
+            ]);
             return {
-                day,
-                uptimeSeconds: values.uptimeSeconds,
-                downtimeSeconds: values.downtimeSeconds,
-                uptimePercentage: total > 0 ? Number(((values.uptimeSeconds / total) * 100).toFixed(2)) : 0,
+                id: row.id,
+                name: row.name,
+                type: row.type,
+                site: { id: row.site.id, name: row.site.name },
+                monitoringDefinition: row.monitoringDefinition,
+                onMs: metrics.onMs,
+                offMs: metrics.offMs,
+                unknownMs: metrics.unknownMs,
+                eligibleMs: metrics.eligibleMs,
+                knownMs: metrics.knownMs,
+                dataCoverage: metrics.dataCoverage,
+                completedOnSessionCount: metrics.completedOnSessionCount,
+                averageCompletedOnSessionMs: metrics.averageCompletedOnSessionMs,
+                longestCompletedOnSessionMs: metrics.longestCompletedOnSessionMs,
+                snapshot,
             };
-        });
+        }));
+        const sum = (key) => equipment.reduce((total, row) => total + row[key], 0);
+        const eligibleMs = sum('eligibleMs'), knownMs = sum('knownMs'), onMs = sum('onMs');
+        return {
+            period: { from: period.from, to: period.to, timezone: period.timezone },
+            units: 'equipment-hours',
+            totals: {
+                equipment: equipment.length,
+                onMs,
+                offMs: sum('offMs'),
+                unknownMs: sum('unknownMs'),
+                eligibleMs,
+                dataCoverage: eligibleMs ? knownMs / eligibleMs : null,
+                onShareOfKnown: knownMs ? onMs / knownMs : null,
+            },
+            equipment,
+        };
+    }
+    async csv(userId, filters) {
+        const report = await this.fleet(userId, filters);
+        const columnCount = 14;
+        const utf8Bom = '\uFEFF';
+        const escapeCell = (value) => {
+            if (value === null || value === undefined)
+                return '';
+            if (typeof value === 'number')
+                return Number.isFinite(value) ? String(value) : '';
+            if (typeof value === 'boolean')
+                return value ? 'Yes' : 'No';
+            const text = value instanceof Date
+                ? value.toISOString()
+                : typeof value === 'string'
+                    ? value
+                    : (JSON.stringify(value) ?? '');
+            const safeText = /^[=+@-]/.test(text.trimStart()) ? `'${text}` : text;
+            return /[",\r\n\t]/.test(safeText) || /^\s|\s$/.test(safeText)
+                ? `"${safeText.replaceAll('"', '""')}"`
+                : safeText;
+        };
+        const csvRow = (cells = []) => {
+            const normalized = cells.slice(0, columnCount);
+            while (normalized.length < columnCount)
+                normalized.push('');
+            return normalized.map(escapeCell).join(',');
+        };
+        const hours = (milliseconds) => milliseconds === null
+            ? ''
+            : Number((milliseconds / 3_600_000).toFixed(2));
+        const percentage = (ratio) => ratio === null ? '' : Number((ratio * 100).toFixed(2));
+        const rows = [
+            ['ACTPulse Fleet Duration Report'],
+            ['Report information'],
+            ['Field', 'Value'],
+            ['Generated at (UTC)', new Date().toISOString()],
+            ['Period start (UTC)', report.period.from.toISOString()],
+            ['Period end (UTC)', report.period.to.toISOString()],
+            ['Reporting timezone', report.period.timezone],
+            ['Equipment in scope', report.totals.equipment],
+            [],
+            ['Fleet summary'],
+            ['Metric', 'Value', 'Unit'],
+            ['Observed ON', hours(report.totals.onMs), 'equipment-hours'],
+            ['Observed OFF', hours(report.totals.offMs), 'equipment-hours'],
+            ['Unknown', hours(report.totals.unknownMs), 'equipment-hours'],
+            ['Eligible period', hours(report.totals.eligibleMs), 'equipment-hours'],
+            ['Data coverage', percentage(report.totals.dataCoverage), 'percent'],
+            [
+                'ON share of known time',
+                percentage(report.totals.onShareOfKnown),
+                'percent',
+            ],
+            [],
+            ['Methodology'],
+            [
+                'UTC event storage; the selected timezone is used for calendar-day grouping. Unknown intervals are excluded from known ON/OFF ratios and are never counted as OFF.',
+            ],
+            [],
+            ['Equipment details'],
+            [
+                'Equipment',
+                'Site',
+                'Type',
+                'Monitoring definition',
+                'Current state',
+                'Connectivity',
+                'ON hours',
+                'OFF hours',
+                'Unknown hours',
+                'Eligible hours',
+                'Coverage (%)',
+                'Completed ON sessions',
+                'Average completed session (hours)',
+                'Longest completed session (hours)',
+            ],
+        ];
+        const equipment = [...report.equipment].sort((left, right) => left.site.name.localeCompare(right.site.name) ||
+            left.name.localeCompare(right.name));
+        for (const item of equipment)
+            rows.push([
+                item.name,
+                item.site.name,
+                item.type,
+                item.monitoringDefinition ?? 'Unclassified',
+                item.snapshot?.state ?? 'UNKNOWN',
+                item.snapshot?.connectivity ?? 'NEVER_CONNECTED',
+                hours(item.onMs),
+                hours(item.offMs),
+                hours(item.unknownMs),
+                hours(item.eligibleMs),
+                percentage(item.dataCoverage),
+                item.completedOnSessionCount,
+                hours(item.averageCompletedOnSessionMs),
+                hours(item.longestCompletedOnSessionMs),
+            ]);
+        return `${utf8Bom}${rows.map(csvRow).join('\r\n')}\r\n`;
     }
 };
 exports.ReportsService = ReportsService;
 exports.ReportsService = ReportsService = __decorate([
     (0, common_1.Injectable)(),
-    __param(0, (0, typeorm_1.InjectRepository)(user_entity_1.User)),
-    __param(1, (0, typeorm_1.InjectRepository)(device_entity_1.Device)),
-    __param(2, (0, typeorm_1.InjectRepository)(sensor_log_entity_1.SensorLog)),
+    __param(0, (0, typeorm_1.InjectRepository)(device_entity_1.Device)),
+    __param(1, (0, typeorm_1.InjectRepository)(device_binding_entity_1.DeviceBinding)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
         typeorm_2.Repository,
-        typeorm_2.Repository])
+        monitoring_service_1.EquipmentAccessService,
+        monitoring_service_1.MonitoringService])
 ], ReportsService);
 //# sourceMappingURL=reports.service.js.map

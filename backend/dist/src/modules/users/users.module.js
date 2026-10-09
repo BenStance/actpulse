@@ -15,8 +15,10 @@ const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
 const roles_guard_1 = require("../../common/guards/roles.guard");
 const auth_module_1 = require("../auth/auth.module");
 const device_entity_1 = require("../devices/device.entity");
+const equipment_entity_1 = require("../equipment/equipment.entity");
 const mail_module_1 = require("../mail/mail.module");
 const user_entity_1 = require("./user.entity");
+const organization_entity_1 = require("../organizations/organization.entity");
 const users_controller_1 = require("./users.controller");
 const users_service_1 = require("./users.service");
 let UsersModule = class UsersModule {
@@ -25,7 +27,14 @@ exports.UsersModule = UsersModule;
 exports.UsersModule = UsersModule = __decorate([
     (0, common_1.Module)({
         imports: [
-            typeorm_1.TypeOrmModule.forFeature([user_entity_1.User, device_entity_1.Device, password_otp_entity_1.PasswordOtp, token_blacklist_entity_1.TokenBlacklist]),
+            typeorm_1.TypeOrmModule.forFeature([
+                user_entity_1.User,
+                device_entity_1.Device,
+                equipment_entity_1.Equipment,
+                organization_entity_1.Organization,
+                password_otp_entity_1.PasswordOtp,
+                token_blacklist_entity_1.TokenBlacklist,
+            ]),
             (0, common_1.forwardRef)(() => auth_module_1.AuthModule),
             mail_module_1.MailModule,
         ],

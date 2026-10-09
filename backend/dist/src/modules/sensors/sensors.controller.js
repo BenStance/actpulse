@@ -21,15 +21,15 @@ const heartbeat_dto_1 = require("./dto/heartbeat.dto");
 const sensor_status_dto_1 = require("./dto/sensor-status.dto");
 const sensors_service_1 = require("./sensors.service");
 let SensorsController = class SensorsController {
-    sensorsService;
-    constructor(sensorsService) {
-        this.sensorsService = sensorsService;
+    sensors;
+    constructor(sensors) {
+        this.sensors = sensors;
     }
-    pushStatus(device, dto) {
-        return this.sensorsService.pushStatus(device, dto);
+    status(device, dto) {
+        return this.sensors.pushStatus(device, dto);
     }
-    heartbeat(device, _dto) {
-        return this.sensorsService.heartbeat(device);
+    heartbeat(device, dto) {
+        return this.sensors.heartbeat(device, dto);
     }
 };
 exports.SensorsController = SensorsController;
@@ -38,15 +38,17 @@ __decorate([
     __param(0, (0, current_device_decorator_1.CurrentDevice)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [device_entity_1.Device, sensor_status_dto_1.SensorStatusDto]),
+    __metadata("design:paramtypes", [device_entity_1.Device,
+        sensor_status_dto_1.SensorStatusDto]),
     __metadata("design:returntype", void 0)
-], SensorsController.prototype, "pushStatus", null);
+], SensorsController.prototype, "status", null);
 __decorate([
     (0, common_1.Post)('heartbeat'),
     __param(0, (0, current_device_decorator_1.CurrentDevice)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [device_entity_1.Device, heartbeat_dto_1.HeartbeatDto]),
+    __metadata("design:paramtypes", [device_entity_1.Device,
+        heartbeat_dto_1.HeartbeatDto]),
     __metadata("design:returntype", void 0)
 ], SensorsController.prototype, "heartbeat", null);
 exports.SensorsController = SensorsController = __decorate([

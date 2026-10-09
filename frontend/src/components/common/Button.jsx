@@ -1,51 +1,136 @@
-// src/components/common/Button.jsx
+import { forwardRef } from 'react';
 import { useThemeContext } from '../../context/ThemeContext';
 
-export default function Button({ children, variant = 'primary', className = '', loading = false, ...props }) {
-  const { darkMode, getBrandPrimary, getBrandSecondary } = useThemeContext();
-  const primaryColor = getBrandPrimary?.() || '#064789';
-  const secondaryColor = getBrandSecondary?.() || '#427aa1';
+const Spinner = () => (
+  <svg className="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+  </svg>
+);
 
-  const baseClasses = 'relative inline-flex items-center justify-center gap-2 rounded-xl px-6 py-2.5 text-base font-semibold transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed overflow-hidden group';
-  
-  const variants = {
-    primary: darkMode
-      ? `bg-gradient-to-r from-[${primaryColor}] to-[${secondaryColor}] text-white shadow-lg hover:shadow-xl hover:scale-105 focus:ring-[${secondaryColor}]`
-      : `bg-gradient-to-r from-[${primaryColor}] to-[${secondaryColor}] text-white shadow-md hover:shadow-lg hover:scale-105 focus:ring-[${primaryColor}]`,
-    secondary: darkMode
-      ? 'border-2 border-[#427aa1] text-[#427aa1] bg-transparent hover:bg-[#427aa1]/10 hover:scale-105 focus:ring-[#427aa1]'
-      : 'border-2 border-[#064789] text-[#064789] bg-transparent hover:bg-[#064789]/5 hover:scale-105 focus:ring-[#064789]',
-    outline: darkMode
-      ? 'border border-slate-600 text-slate-300 bg-transparent hover:bg-slate-800 hover:border-[#427aa1] hover:text-[#427aa1]'
-      : 'border border-slate-300 text-slate-700 bg-transparent hover:bg-slate-50 hover:border-[#064789] hover:text-[#064789]',
+const Button = forwardRef(function Button(
+  {
+    children,
+    variant = 'primary',
+    size = 'md',
+    className = '',
+    loading = false,
+    disabled = false,
+    leftIcon: LeftIcon,
+    rightIcon: RightIcon,
+    fullWidth = false,
+    type = 'button',
+    ...props
+  },
+  ref
+) {
+  const { darkMode, getBrandPrimary, getBrandSecondary } = useThemeContext();
+  const primary = getBrandPrimary?.() || '#064789';
+  const secondary = getBrandSecondary?.() || '#427aa1';
+
+  const isDisabled = disabled || loading;
+
+  const sizeClasses = {
+    sm: 'px-3.5 py-2 text-sm rounded-lg gap-1.5',
+    md: 'px-5 py-2.5 text-sm rounded-xl gap-2',
+    lg: 'px-6 py-3 text-base rounded-xl gap-2',
+    icon: 'p-2.5 rounded-xl',
   };
 
-  // Apply gradient with inline style for dynamic colors
-  const gradientStyle = (variant === 'primary') ? {
-    background: `linear-gradient(135deg, ${primaryColor}, ${secondaryColor})`,
-    boxShadow: darkMode ? `0 0 10px ${secondaryColor}80` : `0 2px 8px ${primaryColor}60`,
-  } : {};
+  const base =
+    'relative inline-flex items-center justify-center font-semibold tracking-tight ' +
+    'transition-all duration-200 ease-out select-none whitespace-nowrap ' +
+    'focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 ' +
+    'disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:scale-100 ' +
+    'active:scale-[0.97]';
+
+  // ---------- Variant styles ----------
+  const variantStyles = {
+    primary: {
+      style: {
+        background: `linear-gradient(135deg, ${primary} 0%, ${secondary} 100%)`,
+        boxShadow: darkMode
+          ? `0 4px 14px ${primary}40`
+          : `0 4px 14px ${primary}30`,
+        color: '#fff',
+      },
+      className: 'hover:shadow-lg hover:brightness-110 focus-visible:ring-[var(--btn-ring)]',
+      cssVars: { '--btn-ring': secondary },
+    },
+    secondary: {
+      style: darkMode
+        ? { color: secondary, borderColor: secondary, backgroundColor: 'transparent' }
+        : { color: primary, borderColor: primary, backgroundColor: 'transparent' },
+      className:
+        'border-2 hover:scale-[1.02] focus-visible:ring-[var(--btn-ring)] ' +
+        (darkMode
+          ? 'hover:bg-white/5'
+          : 'hover:bg-black/[0.03]'),
+      cssVars: { '--btn-ring': darkMode ? secondary : primary },
+    },
+    outline: {
+      style: {},
+      className:
+        'border transition-colors focus-visible:ring-[var(--btn-ring)] ' +
+        (darkMode
+          ? 'border-slate-700 text-slate-200 hover:bg-slate-800 hover:border-slate-600'
+          : 'border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400'),
+      cssVars: { '--btn-ring': secondary },
+    },
+    ghost: {
+      style: {},
+      className:
+        'transition-colors focus-visible:ring-[var(--btn-ring)] ' +
+        (darkMode
+          ? 'text-slate-300 hover:bg-slate-800 hover:text-white'
+          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'),
+      cssVars: { '--btn-ring': secondary },
+    },
+    danger: {
+      style: {},
+      className:
+        'text-white bg-rose-600 hover:bg-rose-700 shadow-md shadow-rose-600/20 ' +
+        'focus-visible:ring-rose-500',
+    },
+    success: {
+      style: {},
+      className:
+        'text-white bg-emerald-600 hover:bg-emerald-700 shadow-md shadow-emerald-600/20 ' +
+        'focus-visible:ring-emerald-500',
+    },
+  };
+
+  const v = variantStyles[variant] || variantStyles.primary;
 
   return (
     <button
-      className={`${baseClasses} ${variants[variant] || variants.primary} ${className}`}
-      style={variant === 'primary' ? gradientStyle : {}}
-      disabled={loading || props.disabled}
       {...props}
+      ref={ref}
+      type={type}
+      disabled={isDisabled}
+      style={{ ...v.style, ...v.cssVars, ...props.style }}
+      className={[
+        base,
+        sizeClasses[size],
+        v.className,
+        fullWidth ? 'w-full' : '',
+        className,
+      ].join(' ')}
     >
       {loading ? (
         <>
-          <svg className="animate-spin h-4 w-4 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-          <span>Loading...</span>
+          <Spinner />
+          <span>Loading…</span>
         </>
       ) : (
-        children
+        <>
+          {LeftIcon && <LeftIcon className="h-4 w-4 shrink-0" />}
+          {children}
+          {RightIcon && <RightIcon className="h-4 w-4 shrink-0" />}
+        </>
       )}
-      {/* Ripple overlay on hover */}
-      <span className="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition-opacity duration-300 pointer-events-none" />
     </button>
   );
-}
+});
+
+export default Button;

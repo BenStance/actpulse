@@ -7,9 +7,14 @@ import {
   OneToMany,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { Device } from '../devices/device.entity';
 import { PasswordOtp } from '../auth/password-otp.entity';
+import { Organization } from '../organizations/organization.entity';
+import { UserRole } from '../../common/enums/user-role.enum';
+import { Equipment } from '../equipment/equipment.entity';
 
 @Entity('users')
 export class User {
@@ -25,8 +30,18 @@ export class User {
   @Column({ type: 'varchar', nullable: true })
   password!: string | null;
 
-  @Column()
-  role!: string;
+  @Column({ type: 'varchar' })
+  role!: UserRole;
+
+  @Column({ name: 'organization_id', type: 'uuid', nullable: true })
+  organizationId!: string | null;
+
+  @ManyToOne(() => Organization, (organization) => organization.users, {
+    nullable: true,
+    onDelete: 'RESTRICT',
+  })
+  @JoinColumn({ name: 'organization_id' })
+  organization!: Organization | null;
 
   @Column({ name: 'is_active', default: true })
   isActive!: boolean;
@@ -50,6 +65,14 @@ export class User {
     inverseJoinColumn: { name: 'device_id', referencedColumnName: 'id' },
   })
   devices!: Device[];
+
+  @ManyToMany(() => Equipment, (equipment) => equipment.users)
+  @JoinTable({
+    name: 'user_equipment',
+    joinColumn: { name: 'user_id', referencedColumnName: 'id' },
+    inverseJoinColumn: { name: 'equipment_id', referencedColumnName: 'id' },
+  })
+  equipment!: Equipment[];
 
   @OneToMany(() => PasswordOtp, (otp) => otp.user)
   otps!: PasswordOtp[];

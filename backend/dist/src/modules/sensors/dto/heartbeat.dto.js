@@ -11,13 +11,21 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.HeartbeatDto = void 0;
 const class_validator_1 = require("class-validator");
+const sensor_status_enum_1 = require("../../../common/enums/sensor-status.enum");
 class HeartbeatDto {
     timestamp;
+    status;
 }
 exports.HeartbeatDto = HeartbeatDto;
 __decorate([
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsNumber)(),
+    (0, class_validator_1.IsInt)(),
+    (0, class_validator_1.Min)(1),
     __metadata("design:type", Number)
 ], HeartbeatDto.prototype, "timestamp", void 0);
+__decorate([
+    (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsEnum)(sensor_status_enum_1.SensorStatus),
+    __metadata("design:type", String)
+], HeartbeatDto.prototype, "status", void 0);
 //# sourceMappingURL=heartbeat.dto.js.map

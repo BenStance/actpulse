@@ -5,7 +5,6 @@ import { motion } from 'framer-motion';
 import Particles from '@tsparticles/react';
 import { loadSlim } from '@tsparticles/slim';
 import { useThemeContext } from '../../context/ThemeContext';
-import Loader from '../../components/common/Loader';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import { authApi } from '../../api/actPulse.Api';
@@ -17,7 +16,6 @@ export default function ResetPassword() {
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
   const [isAnimating, setIsAnimating] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { darkMode, toggleTheme, getBrandPrimary, getBrandSecondary } = useThemeContext();
@@ -30,7 +28,6 @@ export default function ResetPassword() {
   }, []);
 
   useEffect(() => {
-    setMounted(true);
     const timer = setTimeout(() => setIsAnimating(true), 300);
     return () => clearTimeout(timer);
   }, []);
@@ -39,6 +36,8 @@ export default function ResetPassword() {
     e.preventDefault();
     setMsg('');
     setError('');
+    const passwordBytes = new TextEncoder().encode(form.newPassword).length;
+    if (passwordBytes < 8 || passwordBytes > 72) { setError('Password must be 8 to 72 UTF-8 bytes.'); return; }
     setLoading(true);
     try {
       const { data } = await authApi.resetPassword(form);
@@ -51,8 +50,6 @@ export default function ResetPassword() {
       setLoading(false);
     }
   };
-
-  if (!mounted) return <Loader fullScreen />;
 
   return (
     <div className="relative min-h-screen overflow-hidden">
@@ -243,6 +240,7 @@ export default function ResetPassword() {
                     placeholder="••••••••"
                     className="pl-10"
                     required
+                    minLength={8}
                   />
                 </div>
               </div>

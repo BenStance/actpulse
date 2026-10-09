@@ -1,4 +1,11 @@
 export declare class CreateDeviceDto {
+    organizationId: string;
+    siteId: string;
+    equipmentId: string;
     name: string;
-    location: string;
+    deviceIdentifier: string;
+    hardwareModel?: string;
+    firmwareVersion?: string;
+    heartbeatIntervalSeconds?: number;
+    offlineTimeoutSeconds?: number;
 }

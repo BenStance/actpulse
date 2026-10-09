@@ -19,37 +19,20 @@ export class HttpLoggingInterceptor implements NestInterceptor {
     const res = http.getResponse<Response>();
 
     const method = req.method;
-    const url = req.originalUrl || req.url;
+    const url = req.path;
     const ip = req.ip;
-    const userAgent = req.get('user-agent') ?? 'unknown-agent';
-    const body = this.maskSensitive(req.body as Record<string, unknown> | undefined);
 
-    this.logger.log(`[REQ] ${method} ${url} ip=${ip} ua="${userAgent}" body=${JSON.stringify(body)}`);
+    this.logger.log(`[REQ] ${method} ${url} ip=${ip}`);
 
     return next.handle().pipe(
       tap({
         next: () => {
           const ms = Date.now() - now;
-          this.logger.log(`[RES] ${method} ${url} status=${res.statusCode} duration=${ms}ms`);
+          this.logger.log(
+            `[RES] ${method} ${url} status=${res.statusCode} duration=${ms}ms`,
+          );
         },
       }),
     );
-  }
-
-  private maskSensitive(body?: Record<string, unknown>) {
-    if (!body || typeof body !== 'object') {
-      return body;
-    }
-
-    const clone = { ...body };
-    const sensitiveKeys = ['password', 'oldPassword', 'newPassword', 'otp', 'token'];
-
-    for (const key of sensitiveKeys) {
-      if (key in clone) {
-        clone[key] = '***';
-      }
-    }
-
-    return clone;
   }
 }

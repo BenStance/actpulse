@@ -1,0 +1,43 @@
+ACTPULSE FUNCTIONALITY STATUS — PHASE 02, MODULES 1–8
+Updated 2026-10-01. This replaces the earlier Phase 01 snapshot.
+
+1. Authentication and account security
+- Admin and Controller are the only roles. There is no public Admin registration or automatic seeded Admin. An initial Admin is created explicitly with npm run admin:bootstrap and environment-supplied credentials; existing Admin accounts are left alone.
+- Bearer JWT login and logout, password reset, Controller invitation activation, and password change are implemented. HTTP and Socket.IO check the same current account state, token version, blacklist, signature, expiry, role, and organization state.
+- Activation requires both an invitation token and OTP. OTPs and invitation tokens are generated securely and stored as hashes. Codes expire, are single-use, have failed-attempt limits, and are replaced when resent. Login and reset responses avoid confirming account existence.
+- Profile allows the signed-in user to view account details and change their name. Email, role, organization, and assignments are read-only in self-service. Account Security changes a password, ends current sessions, and returns the user to login.
+- The frontend validates a stored session on startup and clears cached device data on logout or 401. Socket sessions are disconnected on account or permission changes.
+
+2. Organizations and customer isolation
+- Organizations have name, optional contact email/phone, active status, and timestamps. Controllers, sites, equipment and monitors belong to one organization; Admin accounts are platform-level.
+- The migration placed existing Controllers and devices in Legacy Customer without removing assignments or sensor history. No organization transfer is supported for devices or Controllers.
+- Admin can list, search, create, edit, activate, deactivate, and inspect organizations with Controller/device counts. Controller can view only their own organization summary.
+- An inactive organization blocks Controller sessions and device ingestion. Its history is preserved, and separate account/device active flags stay unchanged.
+- Controller access to sites, equipment, monitors, dashboards, reports, exports, and events requires organization ownership and explicit equipment assignment. Admin can access all organizations. Realtime events go only to Admin and assigned Controllers.
+
+3. Users, devices, and permissions
+- Admin can invite Controllers, edit names, assign or clear equipment, resend pending invitations, deactivate/reactivate accounts, manage organizations/sites/equipment, and provision or retire monitors and rotate keys.
+- Controller can view assigned devices, dashboards, history, reports, and exports, and manage only their own profile/password. Controller cannot manage users, organizations, devices, or API keys.
+- Pending invitation, active, and inactive account states are distinct. Reactivating a pending Controller does not activate the invitation. Assignment changes invalidate the affected session.
+- Ordinary user and device responses are serialized without password hashes, OTPs, invitation tokens, JWTs, or device API keys. New and rotated device keys appear only in dedicated Admin provisioning responses.
+- Admin Users includes search, organization filter, pagination, invitation, assignment editing, resend, and activation controls. Controller device pages are read-only with an empty state.
+
+4. Existing monitoring features
+- ESP32 status/heartbeat ingestion, realtime status events, dashboards, downtime/uptime analytics, and downloadable reports remain implemented. The authorization checks above now scope their data.
+- Billing, subscriptions, fuel management, new hardware work, and extra roles are outside this phase.
+
+5. Verification and limits
+- Backend build and TypeScript check pass. Frontend production build passes with an existing large-bundle warning.
+- The original nine PostgreSQL integration tests passed for modules 1–3, but their device provisioning fixtures need updating for modules 4–8. The new monitoring integration flow passes on a disposable database.
+- Changed modules 4–8 backend and frontend files pass ESLint. Full repository lint retains earlier unrelated findings.
+- A headless Chromium check passed through the real React activation, login, profile, and password-change forms with mocked API responses. Backend API behavior was checked separately by integration tests. SMTP delivery to a real mailbox remains unverified.
+- Authentication request rate limits are in memory for this single backend process. A multi-instance deployment would need a shared store for consistent limits and socket invalidation.
+- backend/.env is now ignored and untracked, but prior Git history exposed its PostgreSQL and SMTP credentials. Those external credentials need rotation. The old hard-coded Admin password should be changed. The local JWT signing secret has been replaced; other deployments using the old secret should replace it.
+
+PHASE 02, MODULES 4–8 — IMPLEMENTED 2026-10-01
+- Sites now have organization ownership, contact/location/timezone fields, active state, Admin management, and Controller read access limited to locations containing assigned equipment.
+- Generator and UPS equipment profiles are separate from IoT monitors. Admin can manage profile details, archive/reactivate, and assign Controllers to equipment. Replacing a monitor keeps the equipment and its Controller assignments.
+- Monitor provisioning issues an API key once, stores only a SHA-256 digest, and records key operations. Rotation invalidates the old key; disable and retire stop ingestion. Existing keys were converted to digests and existing monitors bound to migrated equipment.
+- Status observations, heartbeats, last contact, connectivity transitions, and monitor binding history are persisted. The live dashboard uses current observations, labels stale or missing state UNKNOWN, and separates connectivity from equipment state.
+- Reports calculate observed ON, OFF, and UNKNOWN durations per equipment and local day, support time ranges and CSV, and show event history. A heartbeat alone does not add ON/OFF time. Engine running hours are reported only for equipment explicitly configured with an engine-running input and opening meter reading.
+- The local PostgreSQL database has six migrations applied. Its legacy monitor became one site and one equipment profile; sensor history was preserved. The new disposable-database integration flow passes. Backend TypeScript and frontend build pass. The older account-isolation integration suite still expects the previous device creation and assignment API and needs updating; it currently fails. Full frontend lint still contains earlier unrelated errors, while changed modules 4–8 UI files pass.

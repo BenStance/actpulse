@@ -3,6 +3,7 @@ import { dashboardApi, deviceApi } from '../api/actPulse.Api';
 
 export const useDeviceStore = create((set) => ({
   devices: [], summary: null, uptime: [], downtime: [], activity: [], loading: false,
+  reset: () => set({ devices: [], summary: null, uptime: [], downtime: [], activity: [], loading: false }),
   loadDashboard: async () => {
     set({ loading: true });
     try {

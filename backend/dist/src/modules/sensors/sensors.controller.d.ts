@@ -3,16 +3,20 @@ import { HeartbeatDto } from './dto/heartbeat.dto';
 import { SensorStatusDto } from './dto/sensor-status.dto';
 import { SensorsService } from './sensors.service';
 export declare class SensorsController {
-    private readonly sensorsService;
-    constructor(sensorsService: SensorsService);
-    pushStatus(device: Device, dto: SensorStatusDto): Promise<{
+    private readonly sensors;
+    constructor(sensors: SensorsService);
+    status(device: Device, dto: SensorStatusDto): Promise<{
         message: string;
-        logId?: undefined;
+        logId: string | null;
+        kind: string;
+    }>;
+    heartbeat(device: Device, dto: HeartbeatDto): Promise<{
+        message: string;
+        logId: string | null;
+        kind: string;
     } | {
         message: string;
-        logId: string;
+        connectivity: string;
+        equipmentStateConfirmed: boolean;
     }>;
-    heartbeat(device: Device, _dto: HeartbeatDto): {
-        message: string;
-    };
 }

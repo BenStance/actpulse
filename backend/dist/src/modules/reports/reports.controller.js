@@ -20,63 +20,91 @@ const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
 const roles_guard_1 = require("../../common/guards/roles.guard");
 const reports_service_1 = require("./reports.service");
 let ReportsController = class ReportsController {
-    reportsService;
-    constructor(reportsService) {
-        this.reportsService = reportsService;
+    reports;
+    constructor(reports) {
+        this.reports = reports;
     }
-    deviceUptime(req, deviceId, from, to) {
-        return this.reportsService.getDeviceUptime(req.user.sub, deviceId, from, to);
+    equipment(req, filters) {
+        return this.reports.equipmentReport(req.user.sub, filters);
     }
-    deviceDaily(req, deviceId, from, to) {
-        return this.reportsService.getDeviceDaily(req.user.sub, deviceId, from, to);
+    events(req, filters) {
+        return this.reports.events(req.user.sub, filters);
     }
-    deviceEvents(req, deviceId, from, to) {
-        return this.reportsService.getDeviceEvents(req.user.sub, deviceId, from, to);
+    fleet(req, filters) {
+        return this.reports.fleet(req.user.sub, filters);
     }
-    fleetSummary(req, from, to) {
-        return this.reportsService.getFleetSummary(req.user.sub, from, to);
+    csv(req, filters) {
+        return this.reports.csv(req.user.sub, filters);
+    }
+    legacyUptime(req, filters) {
+        return this.reports.equipmentReport(req.user.sub, filters);
+    }
+    async legacyDaily(req, filters) {
+        return (await this.reports.equipmentReport(req.user.sub, filters)).daily;
+    }
+    legacyEvents(req, filters) {
+        return this.reports.events(req.user.sub, filters);
     }
 };
 exports.ReportsController = ReportsController;
 __decorate([
-    (0, common_1.Get)('device-uptime'),
+    (0, common_1.Get)('equipment'),
     __param(0, (0, common_1.Req)()),
-    __param(1, (0, common_1.Query)('deviceId')),
-    __param(2, (0, common_1.Query)('from')),
-    __param(3, (0, common_1.Query)('to')),
+    __param(1, (0, common_1.Query)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, String, String, String]),
+    __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", void 0)
-], ReportsController.prototype, "deviceUptime", null);
+], ReportsController.prototype, "equipment", null);
 __decorate([
-    (0, common_1.Get)('device-daily'),
+    (0, common_1.Get)('equipment-events'),
     __param(0, (0, common_1.Req)()),
-    __param(1, (0, common_1.Query)('deviceId')),
-    __param(2, (0, common_1.Query)('from')),
-    __param(3, (0, common_1.Query)('to')),
+    __param(1, (0, common_1.Query)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, String, String, String]),
+    __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", void 0)
-], ReportsController.prototype, "deviceDaily", null);
-__decorate([
-    (0, common_1.Get)('device-events'),
-    __param(0, (0, common_1.Req)()),
-    __param(1, (0, common_1.Query)('deviceId')),
-    __param(2, (0, common_1.Query)('from')),
-    __param(3, (0, common_1.Query)('to')),
-    __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, String, String, String]),
-    __metadata("design:returntype", void 0)
-], ReportsController.prototype, "deviceEvents", null);
+], ReportsController.prototype, "events", null);
 __decorate([
     (0, common_1.Get)('fleet-summary'),
     __param(0, (0, common_1.Req)()),
-    __param(1, (0, common_1.Query)('from')),
-    __param(2, (0, common_1.Query)('to')),
+    __param(1, (0, common_1.Query)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, String, String]),
+    __metadata("design:paramtypes", [Object, Object]),
     __metadata("design:returntype", void 0)
-], ReportsController.prototype, "fleetSummary", null);
+], ReportsController.prototype, "fleet", null);
+__decorate([
+    (0, common_1.Get)('fleet.csv'),
+    (0, common_1.Header)('Content-Type', 'text/csv; charset=utf-8'),
+    (0, common_1.Header)('Content-Disposition', 'attachment; filename="actpulse-equipment-report.csv"'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Query)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", void 0)
+], ReportsController.prototype, "csv", null);
+__decorate([
+    (0, common_1.Get)('device-uptime'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Query)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", void 0)
+], ReportsController.prototype, "legacyUptime", null);
+__decorate([
+    (0, common_1.Get)('device-daily'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Query)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
+], ReportsController.prototype, "legacyDaily", null);
+__decorate([
+    (0, common_1.Get)('device-events'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Query)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", void 0)
+], ReportsController.prototype, "legacyEvents", null);
 exports.ReportsController = ReportsController = __decorate([
     (0, common_1.Controller)('reports'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),

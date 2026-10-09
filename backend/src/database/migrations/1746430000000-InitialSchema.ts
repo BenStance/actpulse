@@ -62,7 +62,9 @@ export class InitialSchema1746430000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query('ALTER TABLE "sensor_logs" DROP CONSTRAINT IF EXISTS "FK_sensor_logs_device_id"');
+    await queryRunner.query(
+      'ALTER TABLE "sensor_logs" DROP CONSTRAINT IF EXISTS "FK_sensor_logs_device_id"',
+    );
     await queryRunner.query('DROP TABLE IF EXISTS "sensor_logs"');
     await queryRunner.query('DROP TYPE IF EXISTS "sensor_logs_status_enum"');
     await queryRunner.query('DROP TABLE IF EXISTS "devices"');

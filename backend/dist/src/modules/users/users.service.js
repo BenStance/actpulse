@@ -49,145 +49,323 @@ exports.UsersService = void 0;
 const common_1 = require("@nestjs/common");
 const typeorm_1 = require("@nestjs/typeorm");
 const bcrypt = __importStar(require("bcryptjs"));
+const class_validator_1 = require("class-validator");
 const typeorm_2 = require("typeorm");
 const otp_purpose_enum_1 = require("../../common/enums/otp-purpose.enum");
 const user_role_enum_1 = require("../../common/enums/user-role.enum");
-const mail_service_1 = require("../mail/mail.service");
-const auth_service_1 = require("../auth/auth.service");
+const password_1 = require("../../common/security/password");
+const auth_rate_limiter_service_1 = require("../auth/auth-rate-limiter.service");
+const auth_session_service_1 = require("../auth/auth-session.service");
+const entitlement_service_1 = require("../billing/entitlement.service");
+const audit_trail_service_1 = require("../billing/audit-trail.service");
+const credential_hash_1 = require("../auth/credential-hash");
 const password_otp_entity_1 = require("../auth/password-otp.entity");
 const device_entity_1 = require("../devices/device.entity");
+const equipment_entity_1 = require("../equipment/equipment.entity");
+const mail_service_1 = require("../mail/mail.service");
+const organization_entity_1 = require("../organizations/organization.entity");
 const user_entity_1 = require("./user.entity");
+const user_response_1 = require("./user-response");
 let UsersService = class UsersService {
-    usersRepository;
-    devicesRepository;
-    otpRepository;
-    authService;
-    mailService;
-    constructor(usersRepository, devicesRepository, otpRepository, authService, mailService) {
-        this.usersRepository = usersRepository;
-        this.devicesRepository = devicesRepository;
-        this.otpRepository = otpRepository;
-        this.authService = authService;
-        this.mailService = mailService;
+    users;
+    devices;
+    equipment;
+    organizations;
+    dataSource;
+    mail;
+    sessions;
+    rate;
+    entitlements;
+    auditTrail;
+    constructor(users, devices, equipment, organizations, dataSource, mail, sessions, rate, entitlements, auditTrail) {
+        this.users = users;
+        this.devices = devices;
+        this.equipment = equipment;
+        this.organizations = organizations;
+        this.dataSource = dataSource;
+        this.mail = mail;
+        this.sessions = sessions;
+        this.rate = rate;
+        this.entitlements = entitlements;
+        this.auditTrail = auditTrail;
     }
-    async create(dto) {
-        if (dto.role === user_role_enum_1.UserRole.ADMIN) {
-            throw new common_1.BadRequestException('Admin users are seeded by system bootstrap');
-        }
-        if (dto.role === user_role_enum_1.UserRole.USER) {
-            throw new common_1.BadRequestException('User role is disabled. Only Controller can be invited');
-        }
-        const existing = await this.usersRepository.findOne({ where: { email: dto.email } });
-        if (existing) {
-            throw new common_1.BadRequestException('Email already exists');
-        }
-        const devices = await this.devicesRepository.findBy({ id: (0, typeorm_2.In)(dto.deviceIds) });
-        if (devices.length < 1) {
-            throw new common_1.BadRequestException('User must be assigned at least one valid device');
-        }
-        const user = this.usersRepository.create({
-            name: dto.name,
-            email: dto.email,
-            role: dto.role,
-            isActive: true,
-            isActivated: false,
-            password: null,
-            devices,
-            tokenVersion: 0,
+    async create(dto, actorId) {
+        const email = dto.email.trim().toLowerCase();
+        const organization = await this.organizations.findOne({
+            where: { id: dto.organizationId, isActive: true },
         });
-        const saved = await this.usersRepository.save(user);
-        const otp = `${Math.floor(100000 + Math.random() * 900000)}`;
-        const token = this.authService.generateActivationToken();
-        const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
-        await this.otpRepository.save(this.otpRepository.create({
-            userId: saved.id,
-            email: saved.email,
-            otpCode: otp,
-            token,
-            purpose: otp_purpose_enum_1.OtpPurpose.USER_INVITATION,
-            expiresAt,
-            used: false,
-        }));
-        await this.mailService.sendUserInvitation(saved.email, otp, token);
-        return {
-            message: 'User invited successfully',
-            userId: saved.id,
-            activationToken: token,
-        };
+        if (!organization)
+            throw new common_1.BadRequestException('Active organization required');
+        if (await this.users.exists({ where: { email } }))
+            throw new common_1.BadRequestException('Email already exists');
+        const assignedEquipment = await this.validEquipment(dto.equipmentIds, dto.deviceIds, organization.id);
+        const otp = (0, credential_hash_1.newOtp)();
+        const token = (0, credential_hash_1.newInvitationToken)();
+        const userId = await this.dataSource.transaction(async (manager) => {
+            await this.entitlements.lockAndCheck(organization.id, 'controllers', manager);
+            const user = await manager.save(user_entity_1.User, manager.create(user_entity_1.User, {
+                name: dto.name.trim(),
+                email,
+                role: user_role_enum_1.UserRole.CONTROLLER,
+                organizationId: organization.id,
+                equipment: assignedEquipment,
+                isActive: true,
+                isActivated: false,
+                password: null,
+                tokenVersion: 0,
+            }));
+            await manager.save(password_otp_entity_1.PasswordOtp, manager.create(password_otp_entity_1.PasswordOtp, {
+                userId: user.id,
+                email,
+                otpCode: (0, credential_hash_1.otpHash)(otp_purpose_enum_1.OtpPurpose.USER_INVITATION, email, otp),
+                token: (0, credential_hash_1.invitationHash)(token),
+                purpose: otp_purpose_enum_1.OtpPurpose.USER_INVITATION,
+                expiresAt: new Date(Date.now() + 30 * 60_000),
+                used: false,
+                failedAttempts: 0,
+            }));
+            await this.auditTrail.record({
+                actorId,
+                actorRole: 'Admin',
+                organizationId: organization.id,
+                action: 'USER_INVITED',
+                entityType: 'user',
+                entityId: user.id,
+                after: {
+                    role: 'Controller',
+                    isActive: true,
+                    assignmentCount: assignedEquipment.length,
+                },
+            }, manager);
+            try {
+                await this.mail.sendUserInvitation(email, otp, token);
+            }
+            catch {
+                throw new common_1.ServiceUnavailableException('Invitation could not be delivered');
+            }
+            return user.id;
+        });
+        return { message: 'Controller invited', user: await this.findOne(userId) };
+    }
+    async resendInvitation(id) {
+        const user = await this.userEntity(id);
+        if (user.role !== user_role_enum_1.UserRole.CONTROLLER ||
+            user.isActivated ||
+            !user.isActive ||
+            !user.organization?.isActive) {
+            throw new common_1.BadRequestException('Only active pending Controllers can receive another invitation');
+        }
+        this.rate.check('request', `invitation:${id}`);
+        const otp = (0, credential_hash_1.newOtp)();
+        const token = (0, credential_hash_1.newInvitationToken)();
+        await this.dataSource.transaction(async (manager) => {
+            await manager.update(password_otp_entity_1.PasswordOtp, { userId: id, purpose: otp_purpose_enum_1.OtpPurpose.USER_INVITATION, used: false }, { used: true });
+            await manager.save(password_otp_entity_1.PasswordOtp, manager.create(password_otp_entity_1.PasswordOtp, {
+                userId: id,
+                email: user.email,
+                otpCode: (0, credential_hash_1.otpHash)(otp_purpose_enum_1.OtpPurpose.USER_INVITATION, user.email, otp),
+                token: (0, credential_hash_1.invitationHash)(token),
+                purpose: otp_purpose_enum_1.OtpPurpose.USER_INVITATION,
+                expiresAt: new Date(Date.now() + 30 * 60_000),
+                used: false,
+                failedAttempts: 0,
+            }));
+            try {
+                await this.mail.sendUserInvitation(user.email, otp, token);
+            }
+            catch {
+                throw new common_1.ServiceUnavailableException('Invitation could not be delivered');
+            }
+        });
+        return { message: 'Invitation resent' };
     }
     async activateUser(dto) {
-        const user = await this.usersRepository.findOne({ where: { email: dto.email } });
-        if (!user) {
-            throw new common_1.NotFoundException('User not found');
-        }
-        const otpEntry = await this.otpRepository.findOne({
-            where: {
-                userId: user.id,
-                otpCode: dto.otp,
-                purpose: otp_purpose_enum_1.OtpPurpose.USER_INVITATION,
-                used: false,
-            },
-            order: { createdAt: 'DESC' },
+        const email = dto.email.trim().toLowerCase();
+        this.rate.check('verify', `invitation:${email}`);
+        (0, password_1.validateNewPassword)(dto.password);
+        const user = await this.users.findOne({
+            where: { email },
+            relations: ['organization'],
         });
-        if (!otpEntry || otpEntry.expiresAt.getTime() < Date.now()) {
-            throw new common_1.BadRequestException('Invalid or expired activation OTP');
+        if (!user ||
+            user.role !== user_role_enum_1.UserRole.CONTROLLER ||
+            !user.isActive ||
+            user.isActivated ||
+            !user.organization?.isActive) {
+            throw new common_1.BadRequestException('Invalid or expired invitation');
         }
-        if (otpEntry.token && dto.token && otpEntry.token !== dto.token) {
-            throw new common_1.BadRequestException('Invalid activation token');
-        }
-        user.password = await bcrypt.hash(dto.password, 10);
-        user.isActivated = true;
-        await this.usersRepository.save(user);
-        otpEntry.used = true;
-        await this.otpRepository.save(otpEntry);
+        const activated = await this.dataSource.transaction(async (manager) => {
+            const entry = await manager.getRepository(password_otp_entity_1.PasswordOtp).findOne({
+                where: {
+                    userId: user.id,
+                    purpose: otp_purpose_enum_1.OtpPurpose.USER_INVITATION,
+                    used: false,
+                },
+                order: { createdAt: 'DESC' },
+                lock: { mode: 'pessimistic_write' },
+            });
+            if (!entry || entry.expiresAt.getTime() < Date.now())
+                return false;
+            const maxAttempts = Number(process.env.AUTH_OTP_MAX_ATTEMPTS ?? 5);
+            if (entry.failedAttempts >= maxAttempts)
+                return false;
+            if (entry.otpCode !== (0, credential_hash_1.otpHash)(otp_purpose_enum_1.OtpPurpose.USER_INVITATION, email, dto.otp) ||
+                entry.token !== (0, credential_hash_1.invitationHash)(dto.token)) {
+                entry.failedAttempts += 1;
+                if (entry.failedAttempts >= maxAttempts)
+                    entry.used = true;
+                await manager.save(entry);
+                return false;
+            }
+            await manager.update(user_entity_1.User, user.id, {
+                password: await bcrypt.hash(dto.password, 12),
+                isActivated: true,
+                tokenVersion: user.tokenVersion + 1,
+            });
+            await manager.update(password_otp_entity_1.PasswordOtp, { userId: user.id, purpose: otp_purpose_enum_1.OtpPurpose.USER_INVITATION, used: false }, { used: true });
+            await this.auditTrail.record({
+                actorId: user.id,
+                actorRole: 'Controller',
+                organizationId: user.organizationId,
+                action: 'USER_ACTIVATED',
+                entityType: 'user',
+                entityId: user.id,
+                after: { isActive: true },
+            }, manager);
+            return true;
+        });
+        if (!activated)
+            throw new common_1.BadRequestException('Invalid or expired invitation');
+        this.sessions.invalidateUser(user.id);
         return { message: 'User activated successfully' };
     }
-    findAll() {
-        return this.usersRepository.find({ relations: ['devices'] });
+    async findAll(search = '', organizationId, rawPage = 1, rawPageSize = 20) {
+        if (organizationId && !(0, class_validator_1.isUUID)(organizationId))
+            throw new common_1.BadRequestException('Invalid organization ID');
+        const page = Math.max(1, Number.isFinite(rawPage) ? Math.floor(rawPage) : 1);
+        const pageSize = Math.min(100, Math.max(1, Number.isFinite(rawPageSize) ? Math.floor(rawPageSize) : 20));
+        const qb = this.users
+            .createQueryBuilder('u')
+            .leftJoinAndSelect('u.equipment', 'e')
+            .leftJoinAndSelect('e.monitors', 'd')
+            .leftJoinAndSelect('u.organization', 'o')
+            .where('u.role = :role', { role: user_role_enum_1.UserRole.CONTROLLER });
+        if (organizationId)
+            qb.andWhere('u.organization_id = :organizationId', { organizationId });
+        if (search.trim())
+            qb.andWhere('(LOWER(u.name) LIKE :search OR LOWER(u.email) LIKE :search)', { search: `%${search.trim().toLowerCase()}%` });
+        const [items, total] = await qb
+            .orderBy('u.createdAt', 'DESC')
+            .skip((page - 1) * pageSize)
+            .take(pageSize)
+            .getManyAndCount();
+        return { items: items.map(user_response_1.managedUserSummary), total, page, pageSize };
     }
     async findOne(id) {
-        const user = await this.usersRepository.findOne({ where: { id }, relations: ['devices'] });
-        if (!user) {
-            throw new common_1.NotFoundException('User not found');
-        }
-        return user;
+        return (0, user_response_1.managedUserSummary)(await this.userEntity(id));
     }
     async update(id, dto) {
-        const user = await this.findOne(id);
-        if (dto.deviceIds && dto.deviceIds.length > 0) {
-            const devices = await this.devicesRepository.findBy({ id: (0, typeorm_2.In)(dto.deviceIds) });
-            if (devices.length < 1) {
-                throw new common_1.BadRequestException('At least one valid device is required');
-            }
-            user.devices = devices;
-        }
-        if (dto.name)
-            user.name = dto.name;
-        if (dto.role) {
-            if (dto.role === user_role_enum_1.UserRole.USER) {
-                throw new common_1.BadRequestException('User role is disabled. Use Controller role');
-            }
-            user.role = dto.role;
-        }
-        await this.usersRepository.save(user);
+        const user = await this.userEntity(id);
+        if (user.role !== user_role_enum_1.UserRole.CONTROLLER)
+            throw new common_1.BadRequestException('Only Controllers can be managed here');
+        user.name = dto.name.trim();
+        await this.users.save(user);
         return this.findOne(id);
     }
-    async deactivate(id) {
-        const user = await this.findOne(id);
+    async deactivate(id, actorId) {
+        const user = await this.userEntity(id);
+        if (user.role !== user_role_enum_1.UserRole.CONTROLLER)
+            throw new common_1.BadRequestException('Only Controllers can be managed here');
         user.isActive = false;
         user.tokenVersion += 1;
-        await this.usersRepository.save(user);
-        return { message: 'User deactivated successfully' };
-    }
-    async assignDevices(id, dto) {
-        const user = await this.findOne(id);
-        const devices = await this.devicesRepository.findBy({ id: (0, typeorm_2.In)(dto.deviceIds) });
-        if (devices.length < 1) {
-            throw new common_1.BadRequestException('At least one valid device is required');
-        }
-        user.devices = devices;
-        await this.usersRepository.save(user);
+        await this.dataSource.transaction(async (manager) => {
+            await manager.save(user);
+            await this.auditTrail.record({
+                actorId,
+                actorRole: 'Admin',
+                organizationId: user.organizationId,
+                action: 'USER_DEACTIVATED',
+                entityType: 'user',
+                entityId: id,
+                after: { isActive: false },
+            }, manager);
+        });
+        this.sessions.invalidateUser(id);
         return this.findOne(id);
+    }
+    async reactivate(id, actorId) {
+        const user = await this.userEntity(id);
+        if (user.role !== user_role_enum_1.UserRole.CONTROLLER || !user.organization?.isActive)
+            throw new common_1.BadRequestException('Active organization required');
+        await this.dataSource.transaction(async (manager) => {
+            if (!user.isActive)
+                await this.entitlements.lockAndCheck(user.organizationId, 'controllers', manager);
+            user.isActive = true;
+            await manager.save(user);
+            await this.auditTrail.record({
+                actorId,
+                actorRole: 'Admin',
+                organizationId: user.organizationId,
+                action: 'USER_REACTIVATED',
+                entityType: 'user',
+                entityId: id,
+                after: { isActive: true },
+            }, manager);
+        });
+        return this.findOne(id);
+    }
+    async assignDevices(id, dto, actorId) {
+        const user = await this.userEntity(id);
+        if (user.role !== user_role_enum_1.UserRole.CONTROLLER || !user.organizationId)
+            throw new common_1.BadRequestException('Controller required');
+        user.equipment = await this.validEquipment(dto.equipmentIds, dto.deviceIds, user.organizationId);
+        user.tokenVersion += 1;
+        await this.dataSource.transaction(async (manager) => {
+            await manager.save(user);
+            await this.auditTrail.record({
+                actorId,
+                actorRole: 'Admin',
+                organizationId: user.organizationId,
+                action: 'PERMISSION_ASSIGNMENT_CHANGED',
+                entityType: 'user',
+                entityId: id,
+                after: { assignmentCount: user.equipment.length },
+            }, manager);
+        });
+        this.sessions.invalidateUser(id);
+        return this.findOne(id);
+    }
+    async validEquipment(equipmentIds, deviceIds, organizationId) {
+        if (equipmentIds && deviceIds)
+            throw new common_1.BadRequestException('Use equipmentIds only');
+        let ids = equipmentIds ?? [];
+        if (deviceIds) {
+            const devices = await this.devices.find({
+                where: { id: (0, typeorm_2.In)(deviceIds), organizationId },
+            });
+            if (devices.length !== new Set(deviceIds).size ||
+                devices.some((d) => !d.currentEquipmentId))
+                throw new common_1.BadRequestException('One or more monitors are invalid for this organization');
+            ids = devices.map((d) => d.currentEquipmentId);
+        }
+        if (!ids.length)
+            return [];
+        const unique = [...new Set(ids)];
+        const rows = await this.equipment.find({
+            where: { id: (0, typeorm_2.In)(unique), organizationId },
+        });
+        if (rows.length !== unique.length)
+            throw new common_1.BadRequestException('One or more equipment records are invalid for this organization');
+        return rows;
+    }
+    async userEntity(id) {
+        const user = await this.users.findOne({
+            where: { id },
+            relations: ['equipment', 'equipment.monitors', 'organization'],
+        });
+        if (!user)
+            throw new common_1.NotFoundException('User not found');
+        return user;
     }
 };
 exports.UsersService = UsersService;
@@ -195,11 +373,17 @@ exports.UsersService = UsersService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(user_entity_1.User)),
     __param(1, (0, typeorm_1.InjectRepository)(device_entity_1.Device)),
-    __param(2, (0, typeorm_1.InjectRepository)(password_otp_entity_1.PasswordOtp)),
+    __param(2, (0, typeorm_1.InjectRepository)(equipment_entity_1.Equipment)),
+    __param(3, (0, typeorm_1.InjectRepository)(organization_entity_1.Organization)),
     __metadata("design:paramtypes", [typeorm_2.Repository,
         typeorm_2.Repository,
         typeorm_2.Repository,
-        auth_service_1.AuthService,
-        mail_service_1.MailService])
+        typeorm_2.Repository,
+        typeorm_2.DataSource,
+        mail_service_1.MailService,
+        auth_session_service_1.AuthSessionService,
+        auth_rate_limiter_service_1.AuthRateLimiterService,
+        entitlement_service_1.EntitlementService,
+        audit_trail_service_1.AuditTrailService])
 ], UsersService);
 //# sourceMappingURL=users.service.js.map

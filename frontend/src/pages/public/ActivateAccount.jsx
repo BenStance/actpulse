@@ -5,7 +5,6 @@ import { motion } from 'framer-motion';
 import Particles from '@tsparticles/react';
 import { loadSlim } from '@tsparticles/slim';
 import { useThemeContext } from '../../context/ThemeContext';
-import Loader from '../../components/common/Loader';
 import Button from '../../components/common/Button';
 import Input from '../../components/common/Input';
 import { usersApi } from '../../api/actPulse.Api';
@@ -17,7 +16,6 @@ export default function ActivateAccount() {
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
   const [isAnimating, setIsAnimating] = useState(false);
-  const [mounted, setMounted] = useState(false);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { darkMode, toggleTheme, getBrandPrimary, getBrandSecondary } = useThemeContext();
@@ -30,7 +28,6 @@ export default function ActivateAccount() {
   }, []);
 
   useEffect(() => {
-    setMounted(true);
     const timer = setTimeout(() => setIsAnimating(true), 300);
     return () => clearTimeout(timer);
   }, []);
@@ -39,6 +36,8 @@ export default function ActivateAccount() {
     e.preventDefault();
     setMsg('');
     setError('');
+    const passwordBytes = new TextEncoder().encode(form.password).length;
+    if (passwordBytes < 8 || passwordBytes > 72) { setError('Password must be 8 to 72 UTF-8 bytes.'); return; }
     setLoading(true);
     try {
       const { data } = await usersApi.activate(form);
@@ -51,8 +50,6 @@ export default function ActivateAccount() {
       setLoading(false);
     }
   };
-
-  if (!mounted) return <Loader fullScreen />;
 
   return (
     <div className="relative min-h-screen overflow-hidden">
@@ -232,7 +229,7 @@ export default function ActivateAccount() {
 
               <div>
                 <label className={`block text-sm font-medium mb-2 ${darkMode ? 'text-slate-300' : 'text-slate-700'}`}>
-                  Activation Token {form.token === '' && <span className="text-xs text-slate-400">(optional)</span>}
+                  Activation Token
                 </label>
                 <div className="relative">
                   <UserCheck className={`absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 ${darkMode ? 'text-slate-400' : 'text-slate-500'}`} />
@@ -240,8 +237,9 @@ export default function ActivateAccount() {
                     type="text"
                     value={form.token}
                     onChange={(e) => setForm({ ...form, token: e.target.value })}
-                    placeholder="Activation token (if provided in email)"
+                    placeholder="Activation token from invitation email"
                     className="pl-10"
+                    required
                   />
                 </div>
               </div>
@@ -259,6 +257,7 @@ export default function ActivateAccount() {
                     placeholder="••••••••"
                     className="pl-10"
                     required
+                    minLength={8}
                   />
                 </div>
               </div>

@@ -8,22 +8,19 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.DashboardModule = void 0;
 const common_1 = require("@nestjs/common");
-const typeorm_1 = require("@nestjs/typeorm");
-const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
-const token_blacklist_entity_1 = require("../auth/token-blacklist.entity");
-const device_entity_1 = require("../devices/device.entity");
-const sensor_log_entity_1 = require("../sensors/sensor-log.entity");
-const user_entity_1 = require("../users/user.entity");
+const monitoring_module_1 = require("../monitoring/monitoring.module");
+const operations_module_1 = require("../operations/operations.module");
 const dashboard_controller_1 = require("./dashboard.controller");
 const dashboard_service_1 = require("./dashboard.service");
+const admin_dashboard_service_1 = require("./admin-dashboard.service");
 let DashboardModule = class DashboardModule {
 };
 exports.DashboardModule = DashboardModule;
 exports.DashboardModule = DashboardModule = __decorate([
     (0, common_1.Module)({
-        imports: [typeorm_1.TypeOrmModule.forFeature([user_entity_1.User, device_entity_1.Device, sensor_log_entity_1.SensorLog, token_blacklist_entity_1.TokenBlacklist])],
+        imports: [monitoring_module_1.MonitoringModule, operations_module_1.OperationsModule],
         controllers: [dashboard_controller_1.DashboardController],
-        providers: [dashboard_service_1.DashboardService, jwt_auth_guard_1.JwtAuthGuard],
+        providers: [dashboard_service_1.DashboardService, admin_dashboard_service_1.AdminDashboardService],
         exports: [dashboard_service_1.DashboardService],
     })
 ], DashboardModule);

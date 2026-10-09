@@ -30,9 +30,9 @@ export default function ForgotPassword() {
   }, []);
 
   useEffect(() => {
-    setMounted(true);
+    const mountTimer = setTimeout(() => setMounted(true), 0);
     const timer = setTimeout(() => setIsAnimating(true), 300);
-    return () => clearTimeout(timer);
+    return () => { clearTimeout(mountTimer); clearTimeout(timer); };
   }, []);
 
   const onSubmit = async (e) => {

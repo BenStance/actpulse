@@ -8,6 +8,7 @@ export declare class PasswordOtp {
     purpose: OtpPurpose;
     expiresAt: Date;
     used: boolean;
+    failedAttempts: number;
     userId: string | null;
     user: User | null;
     createdAt: Date;

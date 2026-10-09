@@ -16,56 +16,91 @@ exports.DashboardController = void 0;
 const common_1 = require("@nestjs/common");
 const jwt_auth_guard_1 = require("../../common/guards/jwt-auth.guard");
 const dashboard_service_1 = require("./dashboard.service");
+const admin_dashboard_service_1 = require("./admin-dashboard.service");
+const roles_guard_1 = require("../../common/guards/roles.guard");
+const roles_decorator_1 = require("../../common/decorators/roles.decorator");
+const user_role_enum_1 = require("../../common/enums/user-role.enum");
 let DashboardController = class DashboardController {
-    dashboardService;
-    constructor(dashboardService) {
-        this.dashboardService = dashboardService;
+    dashboard;
+    adminDashboard;
+    constructor(dashboard, adminDashboard) {
+        this.dashboard = dashboard;
+        this.adminDashboard = adminDashboard;
     }
-    summary(req) {
-        return this.dashboardService.getSummary(req.user.sub);
+    admin(req, filters) {
+        return this.adminDashboard.overview(req.user.sub, filters);
     }
-    uptime(req) {
-        return this.dashboardService.getUptime(req.user.sub);
+    overview(req, filters) {
+        return this.dashboard.overview(req.user.sub, filters);
     }
-    downtime(req) {
-        return this.dashboardService.getDowntime(req.user.sub);
+    async summary(req, filters) {
+        return (await this.dashboard.overview(req.user.sub, filters)).summary;
     }
-    activity(req) {
-        return this.dashboardService.getActivity(req.user.sub);
+    async uptime(req, filters) {
+        return (await this.dashboard.overview(req.user.sub, filters)).daily;
+    }
+    async downtime(req, filters) {
+        return (await this.dashboard.overview(req.user.sub, filters)).daily;
+    }
+    async activity(req, filters) {
+        return (await this.dashboard.overview(req.user.sub, filters)).activity;
     }
 };
 exports.DashboardController = DashboardController;
 __decorate([
+    (0, common_1.Get)('admin'),
+    (0, common_1.UseGuards)(roles_guard_1.RolesGuard),
+    (0, roles_decorator_1.Roles)(user_role_enum_1.UserRole.ADMIN),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Query)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", void 0)
+], DashboardController.prototype, "admin", null);
+__decorate([
+    (0, common_1.Get)('overview'),
+    __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Query)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", void 0)
+], DashboardController.prototype, "overview", null);
+__decorate([
     (0, common_1.Get)('summary'),
     __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Query)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
 ], DashboardController.prototype, "summary", null);
 __decorate([
     (0, common_1.Get)('uptime'),
     __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Query)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
 ], DashboardController.prototype, "uptime", null);
 __decorate([
     (0, common_1.Get)('downtime'),
     __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Query)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
 ], DashboardController.prototype, "downtime", null);
 __decorate([
     (0, common_1.Get)('activity'),
     __param(0, (0, common_1.Req)()),
+    __param(1, (0, common_1.Query)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object]),
-    __metadata("design:returntype", void 0)
+    __metadata("design:paramtypes", [Object, Object]),
+    __metadata("design:returntype", Promise)
 ], DashboardController.prototype, "activity", null);
 exports.DashboardController = DashboardController = __decorate([
     (0, common_1.Controller)('dashboard'),
     (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard),
-    __metadata("design:paramtypes", [dashboard_service_1.DashboardService])
+    __metadata("design:paramtypes", [dashboard_service_1.DashboardService,
+        admin_dashboard_service_1.AdminDashboardService])
 ], DashboardController);
 //# sourceMappingURL=dashboard.controller.js.map

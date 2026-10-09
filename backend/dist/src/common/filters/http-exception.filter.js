@@ -23,7 +23,8 @@ let HttpExceptionFilter = class HttpExceptionFilter {
             : { message: 'Internal server error' };
         const message = typeof errorResponse === 'string'
             ? errorResponse
-            : errorResponse.message ?? 'Unknown error';
+            : (errorResponse.message ??
+                'Unknown error');
         const stack = exception instanceof Error ? exception.stack : undefined;
         this.logger.error(`[ERR] ${request.method} ${request.originalUrl || request.url} status=${status} message=${JSON.stringify(message)}`, stack);
         response.status(status).json({

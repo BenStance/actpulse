@@ -1,0 +1,54 @@
+ACTPULSE PHASE TWO — MODULES 9–14 HANDOFF
+Updated: 2026-10-01
+
+9. ADMIN AND CONTROLLER DASHBOARDS
+Database: Uses existing monitoring tables and the new operational tables below.
+Backend: Dashboard summary is scoped through equipment access, with organization/site/type/equipment and period/timezone filters. It adds recorded fuel purchases, finalized apparent usage, labelled estimates, maintenance due counts, open alerts, latest readings, and operational activity. Durations come from the shared monitoring service.
+Frontend: Admin and Controller use the shared MonitoringDashboard with operational cards, discrete fuel points/refill markers, cost trends by currency, comparisons, connectivity status, and popup quick actions. Controller sees assigned equipment only.
+Endpoints: Existing GET /dashboard/summary, /uptime, /downtime, /activity now include the operational data used by the shared dashboard.
+
+10. FUEL READINGS, REFILLS AND ESTIMATES
+Database: fuel_tanks, fuel_readings, fuel_refills, fuel_estimates. The migration copies existing generator tank capacities into dedicated tanks.
+Backend: Manual readings are capacity checked; refills and rates are timestamped; estimate periods are effective dated; the estimate uses eligible observed hours and exposes coverage/limitations. Sensor readings have a separate source identity and cannot be corrected through the manual API.
+Frontend: Responsive Fuel page with site/generator/period selection, discrete reading chart, paginated histories, source labels, and popup forms.
+Endpoints: GET /fuel/:equipmentId; POST /fuel/:equipmentId/tank, /readings, /refills, /estimates; POST /fuel/:kind/:id/correct or /void.
+
+11. FUEL COSTS AND RECONCILIATION
+Database: fuel_adjustments, fuel_reconciliations, and decimal cost columns on fuel_refills.
+Backend: SQL numeric arithmetic calculates refill costs and apparent usage. Reconciliation snapshots source IDs and arithmetic, flags unusual results, and blocks correction/void of records inside finalized periods. Corrections retain original records and link replacements. Costs are grouped by currency.
+Frontend: Adjustment, reconciliation draft, correction, void, and Admin finalization dialogs; balance breakdown and separate purchase, apparent, and estimated figures.
+Endpoints: POST /fuel/:equipmentId/adjustments, /reconciliations; POST /fuel/reconciliations/:id/finalize; correction/void endpoints above.
+
+12. MAINTENANCE SCHEDULING AND SERVICE HISTORY
+Database: maintenance_plans and service_records with audit and correction metadata.
+Backend: Admin manages calendar/hour/both plans. Controllers record service for assigned equipment. Status includes due/overdue/uncertain states. Service cost is stored by currency. Correction retains the old record. A baseline-resetting service requires a plan revision before correction or void.
+Frontend: Maintenance list/calendar summary, status filters, service history, and popup plan/service/correction actions.
+Endpoints: GET /maintenance; POST /maintenance/plans, /services; PATCH /maintenance/plans/:id; POST /maintenance/services/:id/correct or /void.
+
+13. ALERTS AND NOTIFICATIONS
+Database: alert_rules, alerts, notifications, notification_preferences and operational_audit.
+Backend: Admin rules cover offline monitors, low/stale fuel, maintenance, and reconciliation variance. Evaluation deduplicates ongoing conditions, distinguishes acknowledgement from resolution, and notifies currently authorized users. Controller preferences and read state are user scoped. In-app notification delivery is implemented. Email rules are rejected because email delivery/retries are not implemented.
+Frontend: Alert rule/details/acknowledgement dialogs, notification list/preferences, and live unread bell.
+Endpoints: /alerts, /alerts/rules, /alerts/:id/acknowledge; /notifications, /notifications/preferences and read endpoints.
+
+14. REPORTS, ANALYTICS AND EXPORTS
+Database: Uses operational and monitoring tables.
+Backend: GET /reports/operations handles equipment, fleet, fuel, reconciliation, costs, maintenance and alert report types with accessible equipment scope, date limits, pagination, grouped summaries, and CSV export. CSV text is escaped and spreadsheet formulas are neutralized. Export is capped at 5,000 rows.
+Frontend: Shared Reports workspace with filters, summary, breakdown, export dialog, CSV download and client-side PDF using jsPDF/autoTable. PDF export is capped at 500 rows.
+Endpoints: GET /reports/operations and /reports/operations/export.csv. Existing monitoring report endpoints remain available.
+
+PERMISSIONS
+Admin: organization-wide operational read/write, tank/rate/plan/rule management, reconciliation finalization and record correction.
+Controller: read assigned equipment within their organization; add fuel readings/refills/adjustments, draft reconciliations and completed services; correct/void only their own manual records outside finalized or baseline-protected periods; manage their own notification preferences and alert acknowledgements. No organization, device-key, ownership, or global rule management.
+Every backend operation checks equipment access or scopes its query to authorized equipment IDs. WebSocket operational updates use the existing authorized equipment room model.
+
+MIGRATION AND VERIFICATION
+Migration: backend/src/database/migrations/1790842000000-OperationalRecords.ts. Run from backend with configured PostgreSQL credentials: npm run migration:run. Keep DB_SYNCHRONIZE=false. This migration has been applied only to a disposable test database during verification. It has not been applied to the live ACTPulse database and nothing was deployed.
+Checks: Backend TypeScript type check and targeted ESLint passed; frontend production build and targeted ESLint passed; phase2-monitoring end-to-end test passed in a temporary database. The test exercises migration, fuel capacity/cost/reconciliation, finalized immutability, correction history, maintenance, alert lifecycle, Controller isolation, and CSV escaping.
+
+CURRENT LIMITATIONS
+- Email notification delivery/retries are not implemented; in-app delivery is available.
+- PDF layout, light/dark rendering, keyboard operation, and mobile/tablet layouts were code reviewed and built, but have not been manually inspected in a browser with sample data.
+- Dashboard, Fuel and Reports event dates use the selected reporting timezone. Custom date/time input fields are entered in the browser's local timezone; Alerts, Notifications and Maintenance list dates also use the browser's local timezone.
+- CSV and PDF exports are generated on demand. There is no scheduled report or background export system.
+- Service records that reset plan baselines require an explicit plan revision before they can be corrected; that plan revision workflow is not exposed as a single action.

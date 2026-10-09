@@ -1,5 +1,4 @@
 // src/components/layout/PageContainer.jsx
-import { ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { useThemeContext } from '../../context/ThemeContext';
 
@@ -14,10 +13,6 @@ export default function PageContainer({
   const primaryColor = getBrandPrimary?.() || '#064789';
   const secondaryColor = getBrandSecondary?.() || '#427aa1';
   
-  // Accent colors (orange & red)
-  const orangeAccent = '#E63F2E';
-  const redAccent = '#E03A3A';
-
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}

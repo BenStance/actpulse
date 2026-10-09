@@ -1,0 +1,43 @@
+ACTPulse Phase 02, modules 15–18 — implementation handoff
+Date: 2026-10-01
+
+MODULE 15 — SUBSCRIPTIONS
+- Organization subscriptions, trial/paid periods, plan snapshots, request-time access checks, Socket.IO access checks, and concurrent-safe site/equipment/Controller limits are implemented.
+- A new organization selects its first plan to start one 14-day trial. Existing organizations have no plan assigned and may select a first trial; no paid access is silently granted.
+- Controllers without current access are routed to Subscription Control. Billing, subscription, account security, profile and notifications remain accessible. Device ingestion remains active.
+- Limit counts: non-archived sites, non-archived equipment, and enabled Controller accounts (including pending invitations). One initial Controller is allowed before a plan exists so it can select a plan.
+- Stable subscription errors: SUBSCRIPTION_REQUIRED, SUBSCRIPTION_EXPIRED, SUBSCRIPTION_SUSPENDED, FEATURE_NOT_INCLUDED, PLAN_LIMIT_REACHED.
+- Seeded plans (TZS monthly / quarterly / annually): Starter 30,000 / 85,500 / 306,000 (1 site, 3 equipment, 2 Controllers); Operations 75,000 / 213,750 / 765,000 (5, 15, 10); Business 150,000 / 427,500 / 1,530,000 (20, 50, 25). Seed upsert is intentionally DO NOTHING on an existing code so Admin edits survive.
+- The seeded feature list excludes email_alerts because actual email alert delivery is not implemented. Hardware, installation, and SMS are not included.
+
+MODULE 16 — MANUAL BILLING
+- Admin-managed bank/mobile-money instructions, idempotent orders, ordinary invoices with historical snapshots, private PDF/JPEG/PNG proofs, duplicate-reference/hash review warnings, Admin review, verified allocations and partial payments are implemented.
+- Full verified coverage activates a paid period atomically. Trial time is preserved; active same-plan renewals extend from paid end; a different plan starts at paid end. No proration or payment gateway.
+- Invoice and approved-payment receipt PDFs are generated in the frontend from the server's historical invoice and allocation data. These are ordinary billing documents, not tax invoices.
+- Controllers can view their organization's billing and submit proof. Admin can see organizations, review proofs, manage plans/instructions and suspend/restore access with a reason. No Controller can approve payments or change instructions.
+- Uploaded proofs are stored under PROOF_STORAGE_DIR (default backend/storage/proofs), outside static serving, with a 5 MB default PAYMENT_PROOF_MAX_BYTES. Back up this directory with the database.
+
+MODULE 17 — PLATFORM ADMINISTRATION
+- Platform Billing provides plan management, organization subscription/billing history, payment reviews, payment instructions, financial/organization counters, currency-separated balances, verified collection trends, charts, upcoming expiry counts, and a selectable date range.
+- Admin Dashboard separates billing indicators from operational data. Expiry and invoice reminders run hourly and on startup, with 7/3/0-day deduplication. They use existing in-app notifications; email reminders are not configured.
+- Trial conversion is the number of organizations whose trial started in the selected period and later received a paid period, divided by that trial-start cohort. Verified collections are approved allocations, not accounting revenue.
+
+MODULE 18 — AUDIT AND ACTIVITY
+- Append-only application audit records capture whitelisted safe fields for billing, subscriptions, users/assignments, API-key rotation, and operational corrections/finalization. Financial and entitlement audit writes share their transaction.
+- Admin Audit Logs supports date, organization, actor, action and entity filters, details and scoped CSV export. Controllers see organization billing activity and operational audit events only for currently assigned equipment.
+
+API AREAS
+- /subscriptions: plans, status, select; Admin suspend/restore.
+- /billing: self/organization status, paginated and filtered invoices/payments/periods at /billing/history/:kind, invoice details, proof upload/download, instructions, activity; Admin plans, review queue, reviews, stats, audit and instruction management.
+- Operational REST, report/PDF, resource-creation and Socket.IO access are checked against subscription entitlements. Device API-key ingestion does not depend on a subscription.
+
+DATABASE STATE AND SAFE OPERATION
+- Migration 1790842100000-SubscriptionsBilling.ts creates the billing/subscription/audit schema and seeds initial plans. Run future migrations only after backing up and reviewing the target database; keep DB_SYNCHRONIZE=false. The explicit seed command is `cd backend && npm run plans:seed` and does not overwrite existing plan codes.
+- During implementation, a test isolation error applied migrations 1790842000000 and 1790842100000 to the configured application database. A read-only migration check confirmed both. No rollback was attempted because it could remove retained operational/billing data. The test helper was corrected to load ORM configuration only when invoked as a CLI command, and subsequent suites ran in disposable databases. No application was deployed.
+- Configure Admin payment instructions in Platform Billing before requesting manual transfers. No bank or mobile-money account details were seeded.
+
+VERIFICATION AND LIMITS
+- Backend TypeScript, full lint and production build passed. All three E2E suites passed (11 tests) in disposable PostgreSQL databases. Frontend full lint and production build passed.
+- Browser workflows, breakpoint layouts and generated PDFs were not visually verified in this session. The frontend build reports a large JavaScript chunk warning; it is a performance concern, not a build failure.
+- The shared Billing page now uses server-side pagination, search, status and date filters for invoices, payments and periods. The Subscription Control summary still shows up to 100 recent entries of each type. Admin payment reviews are paginated and status-filtered.
+- In-app reminders are implemented; email reminder delivery and email alert delivery remain unimplemented. No live payment gateway, tax invoice, automatic overpayment wallet, or proration is offered.
